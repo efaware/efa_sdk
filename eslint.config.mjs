@@ -69,4 +69,40 @@ export default tseslint.config(
       'react-hooks/exhaustive-deps': 'warn',
     },
   },
+  {
+    // ── Datums-/Zeit-Anzeige (plattformweite Vorgabe) ─────────────────────────
+    // Datum `DD.MM.YYYY`, Zeit `HH:MM` (24 h) — siehe
+    // `app-development-specs/DESIGN_SYSTEM.md` → „Datum & Uhrzeit".
+    // Die `toLocale*`-APIs sind der Grund, warum vorher drei Schreibweisen
+    // nebeneinander standen: `de-DE` ohne Options-Objekt formatiert einstellig
+    // („1.9.2026"), `dateStyle:'short'` kürzt das Jahr („01.09.26"), und ganz ohne
+    // Locale-Argument entscheidet die Browser-Sprache („9/1/2026").
+    // Zahl-Formatierung mit explizitem Locale (`n.toLocaleString('de-DE')`) bleibt
+    // erlaubt — geprüft werden nur die Date-only-APIs, der locale-lose Aufruf und
+    // der Direktaufruf auf `new Date(...)`.
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.property.name='toLocaleDateString']",
+          message:
+            'Datum über formatDate()/formatDateTime() aus „src/frontend/format.ts“ ausgeben — toLocaleDateString liefert „1.9.2026" statt „01.09.2026".',
+        },
+        {
+          selector: "CallExpression[callee.property.name='toLocaleTimeString']",
+          message: 'Uhrzeit über formatTime()/formatDateTime() aus „src/frontend/format.ts“ ausgeben.',
+        },
+        {
+          selector: "CallExpression[callee.property.name='toLocaleString'][arguments.length=0]",
+          message:
+            'toLocaleString() ohne Locale folgt der Browser-Sprache (→ „9/1/2026"). Datum/Zeit über „src/frontend/format.ts“, Zahlen mit explizitem Locale formatieren.',
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='toLocaleString'][callee.object.type='NewExpression'][callee.object.callee.name='Date']",
+          message: 'Datum/Zeit über formatDate()/formatDateTime()/formatTime() aus „src/frontend/format.ts“ ausgeben.',
+        },
+      ],
+    },
+  },
 );

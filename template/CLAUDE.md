@@ -31,6 +31,11 @@ What the SDK provides:
 - `@efa-one/sdk/backend/serviceClient.ts` – app-to-app calls via efa-one gateway
 - `@efa-one/sdk/frontend/i18n.ts` – frontend i18n factory (react-i18next init)
 - `@efa-one/sdk/backend/i18n-backend.ts` – backend i18n helper (loadLocales, t)
+- `@efa-one/sdk/frontend/format` – platform-wide date/time display (`formatDate` → `01.09.2026`,
+  `formatDateTime` → `01.09.2026, 11:05`, `formatTime`, `formatFileStamp`, `localeForLanguage`).
+  Mandatory for every timestamp shown in the UI — `toLocaleDateString`/`toLocaleString` on a
+  date is forbidden (renders `1.9.2026`, or the browser locale's `9/1/2026`) and is caught by
+  the `no-restricted-syntax` ESLint gate. Spec: DESIGN_SYSTEM.md → „Datum & Uhrzeit“
 - `@efa-one/sdk/frontend/DevHeader.tsx` – dev-mode header
 - `@efa-one/sdk/frontend/ui` – das efa-one-Design-System-Kit (Button, Dialog, DropdownMenu, Tooltip, Badge, Input, Alert, EmptyState, Skeleton, RecordDialog, **DataTable**) + `@efa-one/sdk/frontend/ui/styles.css`
 - `@efa-one/sdk/frontend/viewPreferences` – Persistenz-Adapter der `DataTable` (`createViewPreferencesClient`, `useViewPreferences`)

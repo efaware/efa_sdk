@@ -11,7 +11,7 @@ import { defineConfig } from 'vitest/config';
  * Coverage-Standard: TESTING.md (Meta-Repo) → „Coverage-Ratchet". Zwei Ebenen:
  *  1) Globaler FLOOR knapp unter dem Ist-Stand als reiner Regressions-Schutz. Er ist
  *     niedrig, weil er auch die (noch) ungetesteten Module mitzählt — das SDK hat
- *     Tests bislang nur auf auth/health/ipc/viewPreferences/DataTable.
+ *     Tests bislang nur auf auth/health/ipc/viewPreferences/DataTable/format.
  *  2) Per-Datei-Gates auf genau diesen gezielt getesteten Modulen — hier darf die
  *     Abdeckung nicht zurückfallen.
  *
@@ -32,6 +32,7 @@ const perFileThresholds = {
   'src/frontend/ipc.ts': { lines: 58, statements: 57, functions: 56, branches: 50 },
   'src/frontend/viewPreferences.ts': { lines: 25, statements: 22, functions: 35, branches: 28 },
   'src/frontend/ui/DataTable.tsx': { lines: 15, statements: 15, functions: 9, branches: 9 },
+  'src/frontend/format.ts': { lines: 100, statements: 100, functions: 100, branches: 90 },
 };
 
 // Die Config wird immer aus dem Paket-Root geladen (npm test läuft dort).
@@ -59,11 +60,11 @@ export default defineConfig({
       // treffen) — deshalb hier ausschließlich vollqualifizierte src-Pfade.
       exclude: ['src/**/index.ts'],
       thresholds: {
-        // FLOOR — gemessener Ist-Stand 2026-08-21: L 22.41 / S 21.08 / F 20.17 / B 10.52
-        lines: 21,
-        statements: 20,
-        functions: 19,
-        branches: 10,
+        // FLOOR — gemessener Ist-Stand 2026-08-26: L 24.74 / S 23.78 / F 23.60 / B 15.76
+        lines: 23,
+        statements: 22,
+        functions: 22,
+        branches: 14,
         ...perFileThresholds,
       },
     },
