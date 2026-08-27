@@ -723,11 +723,53 @@ bei Refactorings.
   benutzer-persistierte Ansicht (Sortier-/Filter-/Ausblenden-Popover + Zahnrad-
   Spalten-Inventar + Zurücksetzen liefert die Komponente bereits)
 
+## Compose-Allowlist des Kernels (verbindlich)
+
+Der Kernel-Deployer extrahiert `docker-compose.yml` aus deinem Backend-Image und schreibt
+sie auf die Host-VPS — er hält dabei `docker.sock`. Seit dem Umbau von Deny- auf Allowlist
+(Sicherheits-Audit 26.08.2026, Funde #04, #14–#20) wird die Compose vor dem Schreiben mit
+`docker compose config` normalisiert und gegen eine **Allowlist** geprüft: **alles, was
+nicht ausdrücklich erlaubt ist, lehnt der Deploy ab** — mit 400 statt mit einem halb
+aufgesetzten Stack. Dasselbe Gate greift beim Restart eines bestehenden Stacks.
+
+**Erlaubte Top-Level-Schlüssel:** `services`, `networks`, `volumes` (plus `x-…`).
+Nicht erlaubt sind u. a. `secrets`, `configs`, `include`, `version` — und **`name`**:
+der Projektname folgt dem Stack-Verzeichnis.
+
+**Erlaubte Service-Schlüssel:** `image` (Pflicht!), `build`, `command`, `entrypoint`,
+`environment`, `env_file`, `expose`, `ports`, `volumes`, `tmpfs`, `networks`, `depends_on`,
+`restart`, `healthcheck`, `init`, `read_only`, `stop_grace_period`, `labels`, `profiles`,
+`container_name`, `working_dir`, `hostname`, `cap_drop`, `security_opt`, `mem_limit`,
+`cpus`, `pids_limit`, `shm_size`, `logging`.
+
+**Nicht erlaubt** (Auswahl): `privileged`, `cap_add`, `devices`, `network_mode`, `pid`,
+`ipc`, `userns_mode`, `cgroup_parent`, `sysctls`, `ulimits`, `user`, `group_add`,
+`extra_hosts`, `dns`, `secrets`, `configs`, `extends`, `volumes_from`, `runtime`.
+
+Zusätzliche Wert-Regeln, an denen man in der Praxis hängenbleibt:
+
+| Regel | Warum |
+|---|---|
+| **Jeder** Service braucht ein `image:` — `build:` allein reicht nicht | ein Service ohne `image` passiert die Registry-Allowlist nie; der Deployer fährt `up --no-build`, dein `build:`-Block ist auf dem Host also ohnehin inert |
+| `build.context` muss im Stack-Verzeichnis liegen, `dockerfile_inline` ist verboten | der Kontext würde die `.env` mit den Plattform-Secrets mit-tarren |
+| `ports:` nur am Service **`frontend`**, höchstens **einer** im ganzen Stack, Host-Port ≥ 1024 | alles andere umginge den Gateway (Caller-Auth, Provenance-Token, Permissions). Der Host-Port ist für `appType: internal` ohnehin unbenutzt — die Kachel lädt `/apps/{key}/` |
+| Bind-Mounts nur **innerhalb** des Stack-Verzeichnisses (kein `../`, kein absoluter Pfad), nicht auf `.env`/`docker-compose.yml` | `../.secrets` ist der Master-Vault mit `JWT_PRIVATE_KEY` |
+| Benannte Volumes müssen top-level deklariert sein und dürfen dort **nur** `name`/`labels` tragen | `driver_opts: {type: none, device: /, o: bind}` mountet Host-`/` |
+| `env_file:` nur auf Pfade im Stack-Verzeichnis (praktisch `.env`), keine Variablen darin | sonst liest Compose einen beliebigen Host-Pfad und inlined ihn nach `environment:` |
+| `security_opt:` nur `no-new-privileges:true` und `seccomp=./<relativ>` | `unconfined` ist ausschließlich dem Service `sandbox` vorbehalten (bubblewrap) |
+| `converge-net` ist das einzige erlaubte externe Netz; Aliase dürfen keine Plattform-Namen sein | ein Alias `converge-access-backend` finge fremde S2S-Aufrufe ab |
+| `container_name` muss mit dem Projektnamen (= `serviceKey`) beginnen | sonst beansprucht die App den Namen eines Plattform-Containers |
+
+Geprüft wird das **interpolierte** Dokument: `privileged: ${PRIV:-true}`, `<<:`-Merge-Keys
+und `!override`-Tags helfen also nicht. Sidecar-Dateien, die die Compose relativ
+referenziert, gehören nach `stack-files/` (werden pfadtreu ins Stack-Verzeichnis
+gespiegelt). Verbindliche Quelle: `apps/converge-kernel/backend/src/services/composePolicy.ts`.
+
 ## Network rules (do not change)
 
 **Standard-Stack (3 Container):**
 - `database` service: only on `app-internal`, **never** `converge-net`
-- `frontend` service: must have a `ports:` mapping so efa-one can load it as an iframe tile (use `FRONTEND_PORT` variable)
+- `frontend` service: darf als **einziger** Service ein `ports:`-Mapping haben — höchstens eines im ganzen Stack, Host-Port ≥ 1024 (`FRONTEND_PORT`-Variable). Der Kernel lehnt jeden anderen veröffentlichten Port ab (siehe „Compose-Allowlist des Kernels")
 - `backend` service: `expose:` only (no host port needed)
 - Build context in `docker-compose.yml`: repo root (so one context sees both `backend/` + `frontend/` package*.json + src; `@efa-one/sdk` comes via `npm ci`)
 
