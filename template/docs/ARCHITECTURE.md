@@ -327,13 +327,19 @@ Business logic routes **must** emit the appropriate calls. This is how efa-one r
 
 | Operation | Call | Notes |
 |---|---|---|
-| Entity created | `reportEvent('entity.created', { id, ...ctx }, token)` | After successful DB insert |
-| Entity updated | `reportEvent('entity.updated', { id, changes }, token)` | After successful DB update |
-| Entity deleted | `reportEvent('entity.deleted', { id }, token)` | After successful DB delete |
-| User-triggered action | `reportActivity('verb', token, undefined, 'entity')` | Export, submit, approve, reject |
-| Measured operation | `reportMetric('name_ms', elapsed, { dims }, token)` | File processing, batch sync |
+| Entity created | `reportEvent('entity.created', { id, ...ctx }, userId)` | After successful DB insert |
+| Entity updated | `reportEvent('entity.updated', { id, changes }, userId)` | After successful DB update |
+| Entity deleted | `reportEvent('entity.deleted', { id }, userId)` | After successful DB delete |
+| User-triggered action | `reportActivity('verb', 'entity', userId)` | Export, submit, approve, reject |
+| Measured operation | `reportMetric('name_ms', elapsed, { dims })` | File processing, batch sync |
 | Permission-relevant event | `logAudit('entity.verb', { targetId, actor, ...ctx }, token)` | Role changes, access grants |
-| Error with business context | `reportLog('error', 'message', { ctx }, token)` | Catch blocks |
+| Error with business context | `reportLog('error', 'message', { ctx })` | Catch blocks |
+
+`reportActivity`'s `userId` is **mandatory in practice**: the kernel silently drops the
+entry if it's missing or unresolvable (`user_activity.user_id` is `NOT NULL`).
+`reportEvent`'s `userId` is optional (system-triggered events may omit it). Always pass
+the platform user id — `req.user?.convergeId`, never `req.user?.sub` (app-local id, won't
+resolve against the kernel's `users` table) and never a raw session cookie/token.
 
 ### Event naming convention
 
@@ -346,22 +352,22 @@ import { reportEvent, reportLog, reportMetric, reportActivity } from '@efa-one/s
 import { logAudit } from '@efa-one/sdk/backend/audit';
 
 // After a successful DB insert:
-reportEvent('item.created', { itemId: result.id, createdBy: req.user.sub }, req.cookies?.app_session);
+reportEvent('item.created', { itemId: result.id }, req.user?.convergeId);
 
 // After a user-triggered export:
 const start = Date.now();
 // ... export logic ...
-reportActivity('export', req.cookies?.app_session, undefined, 'items');
-reportMetric('export_duration_ms', Date.now() - start, { format: 'csv' }, req.cookies?.app_session);
+reportActivity('export', 'items', req.user?.convergeId);
+reportMetric('export_duration_ms', Date.now() - start, { format: 'csv' });
 
 // After a permission-relevant action (role change, access grant):
 logAudit('user.role_changed', { targetId: userId, newRole: 'admin', actor: req.user.sub }, req.cookies?.app_session);
 
 // In a catch block with business context:
-reportLog('error', 'Export failed', { itemCount: count, reason: err.message }, req.cookies?.app_session);
+reportLog('error', 'Export failed', { itemCount: count, reason: err.message });
 ```
 
-Pass `req.cookies?.app_session` as `token` — efa-one uses it to resolve tenant and user context.
+`logAudit` still takes an optional trailing `token` (unchanged — see `audit.ts`); `reportEvent`/`reportActivity` take a plain `userId` string, resolved live by the kernel — never pass a cookie or JWT there.
 
 ### Reporting-DB
 

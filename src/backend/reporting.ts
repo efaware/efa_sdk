@@ -42,12 +42,23 @@ function ingest(entries: ReportEntry[]): void {
   const registryKey = process.env.SERVICE_AUTH_KEY;
   if (registryKey) headers['X-Service-Auth-Key'] = registryKey;
 
-  // Fire-and-forget: intentionally not awaited
-  fetch(url, { method: 'POST', headers, body: JSON.stringify(entries) }).catch((err) => {
-    console.error(
-      JSON.stringify({ level: 'error', msg: 'Reporting ingest failed', err: String(err) }),
-    );
-  });
+  // Fire-and-forget: intentionally not awaited. fetch() only rejects on
+  // network-level failure — an HTTP error status (e.g. 401 from a missing/
+  // stale SERVICE_AUTH_KEY) resolves normally, so it must be checked
+  // explicitly or a broken key goes unnoticed forever (no error, no data).
+  fetch(url, { method: 'POST', headers, body: JSON.stringify(entries) })
+    .then((res) => {
+      if (!res.ok) {
+        console.error(
+          JSON.stringify({ level: 'error', msg: 'Reporting ingest rejected', status: res.status }),
+        );
+      }
+    })
+    .catch((err) => {
+      console.error(
+        JSON.stringify({ level: 'error', msg: 'Reporting ingest failed', err: String(err) }),
+      );
+    });
 }
 
 const appName = () => process.env.APP_NAME ?? 'app';
@@ -85,11 +96,23 @@ export function reportMetric(
   ingest([{ type: 'metric', sourceApp: appName(), appVersion: appVersion(), metricName, value, dimensions }]);
 }
 
-/** Send a user activity event to Converge reporting. */
+/**
+ * Send a user activity event to Converge reporting.
+ *
+ * `userId` is mandatory in practice: the kernel drops the entry silently if
+ * it's missing or doesn't resolve to a real user (`user_activity.user_id` is
+ * NOT NULL). Warn here so a missing userId is visible in the caller's own
+ * logs instead of only showing up as a gap in the reporting dashboard.
+ */
 export function reportActivity(
   action: string,
   resource?: string,
   userId?: string,
 ): void {
+  if (!userId) {
+    console.warn(
+      JSON.stringify({ level: 'warn', msg: 'reportActivity without userId — kernel will drop this entry', action }),
+    );
+  }
   ingest([{ type: 'activity', sourceApp: appName(), appVersion: appVersion(), action, userId, resource }]);
 }

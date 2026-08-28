@@ -8,7 +8,7 @@ describe('reporting client', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    fetchMock = vi.fn().mockResolvedValue({ status: 202 });
+    fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 202 });
     vi.stubGlobal('fetch', fetchMock);
     vi.stubEnv('REPORTING_URL', REPORTING_URL);
     vi.stubEnv('SERVICE_AUTH_KEY', SERVICE_AUTH_KEY);
@@ -59,5 +59,37 @@ describe('reporting client', () => {
     reportEvent('item.created', {});
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('logs a warning when reportActivity is called without a userId', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    reportActivity('export', 'items');
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain('reportActivity');
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn when reportActivity is called with a userId', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    reportActivity('export', 'items', 'converge-user-1');
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('logs an error when the kernel rejects the request', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 401 });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    reportEvent('item.created', {});
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0][0]).toContain('Reporting ingest rejected');
+    errorSpy.mockRestore();
   });
 });

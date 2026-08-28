@@ -319,23 +319,30 @@ Never await them on the critical path. Never skip them.
 
 | Action type | Required call | Timing |
 |---|---|---|
-| Create / update / delete any entity | `reportEvent('entity.verb', { id, ...context }, req.cookies?.app_session)` | After successful DB write |
-| User-facing action (export, submit, approve, reject) | `reportActivity('verb', req.cookies?.app_session, undefined, 'entity')` | After action completes |
-| Measured operation (batch, file processing, sync) | `reportMetric('name_ms', elapsed, { ...dims }, req.cookies?.app_session)` | After operation |
+| Create / update / delete any entity | `reportEvent('entity.verb', { id, ...context }, req.user?.convergeId)` | After successful DB write |
+| User-facing action (export, submit, approve, reject) | `reportActivity('verb', 'entity', req.user?.convergeId)` | After action completes |
+| Measured operation (batch, file processing, sync) | `reportMetric('name_ms', elapsed, { ...dims })` | After operation |
 | Permission-relevant / compliance event | `logAudit('entity.verb', { targetId, ...context }, req.cookies?.app_session)` | After action |
-| Errors with business context | `reportLog('error', 'message', { ...context }, req.cookies?.app_session)` | In catch block |
+| Errors with business context | `reportLog('error', 'message', { ...context })` | In catch block |
 
 **Event naming:** `noun.verb` lowercase — e.g. `order.created`, `export.started`, `approval.rejected`.
+
+`reportActivity`'s `userId` is **mandatory in practice** — the kernel silently drops the
+entry if it's missing or doesn't resolve to a real Converge user (`user_activity.user_id`
+is `NOT NULL`). `reportEvent`'s `userId` is optional; omit it only for system-triggered
+events with no acting user. Always pass the platform user id (`req.user?.convergeId`),
+**never** `req.user?.sub` (that's the app-local id and won't resolve against the kernel's
+`users` table) and never a raw session cookie/token.
 
 ```ts
 import { reportEvent, reportActivity, reportMetric, reportLog } from '@efa-one/sdk/backend/reporting';
 import { logAudit } from '@efa-one/sdk/backend/audit';
 
 // After a successful DB insert:
-reportEvent('item.created', { itemId: result.id, createdBy: req.user.sub }, req.cookies?.app_session);
+reportEvent('item.created', { itemId: result.id }, req.user?.convergeId);
 
 // After a user-triggered export:
-reportActivity('export', req.cookies?.app_session, undefined, 'items');
+reportActivity('export', 'items', req.user?.convergeId);
 ```
 
 Both clients are fire-and-forget. If `REPORTING_URL` / `AUDIT_URL` is not set, calls are silent no-ops — no try/catch needed around them.
