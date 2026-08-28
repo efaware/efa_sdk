@@ -20,7 +20,7 @@ RUN cd frontend && npx vite build
 # nginx-unprivileged (offizielles nginx-Org-Image, BSD-2): läuft als non-root
 # User `nginx` (uid 101), lauscht auf 8080 statt 80, pid + temp-Pfade unter /tmp.
 # Damit non-root + read-only-Rootfs ohne manuelles Verbiegen (Findings #2/#22).
-FROM nginxinc/nginx-unprivileged:alpine@sha256:334d92979f15aaecd5dd50af5105e1230e2bb70765d45b1e2f964e7c5eda81c3
+FROM nginxinc/nginx-unprivileged:alpine@sha256:901e944d1f4fc2bd077e8f5568b98c1f6f8cdacf6b97a87747c43134a339b9a7
 
 COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
