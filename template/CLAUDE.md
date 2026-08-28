@@ -752,7 +752,7 @@ Zusätzliche Wert-Regeln, an denen man in der Praxis hängenbleibt:
 |---|---|
 | **Jeder** Service braucht ein `image:` — `build:` allein reicht nicht | ein Service ohne `image` passiert die Registry-Allowlist nie; der Deployer fährt `up --no-build`, dein `build:`-Block ist auf dem Host also ohnehin inert |
 | `build.context` muss im Stack-Verzeichnis liegen, `dockerfile_inline` ist verboten | der Kontext würde die `.env` mit den Plattform-Secrets mit-tarren |
-| `ports:` nur am Service **`frontend`**, höchstens **einer** im ganzen Stack, Host-Port ≥ 1024 | alles andere umginge den Gateway (Caller-Auth, Provenance-Token, Permissions). Der Host-Port ist für `appType: internal` ohnehin unbenutzt — die Kachel lädt `/apps/{key}/` |
+| `ports:` nur am Service **`frontend`**, höchstens **einer** im ganzen Stack, Host-Port ≥ 1024, **`host_ip` muss `127.0.0.1` sein** | alles andere umginge den Gateway (Caller-Auth, Provenance-Token, Permissions). Der Host-Port ist für `appType: internal` ohnehin unbenutzt — die Kachel lädt `/apps/{key}/`. Ohne `host_ip` veröffentlicht Docker auf `0.0.0.0` und legt seine DNAT-Regeln vor die Host-Firewall (ufw wird von den DOCKER-iptables-Ketten umgangen) — der Port wäre direkt aus dem Internet erreichbar (Fund #15, Stufe P2) |
 | Bind-Mounts nur **innerhalb** des Stack-Verzeichnisses (kein `../`, kein absoluter Pfad), nicht auf `.env`/`docker-compose.yml` | `../.secrets` ist der Master-Vault mit `JWT_PRIVATE_KEY` |
 | Benannte Volumes müssen top-level deklariert sein und dürfen dort **nur** `name`/`labels` tragen | `driver_opts: {type: none, device: /, o: bind}` mountet Host-`/` |
 | `env_file:` nur auf Pfade im Stack-Verzeichnis (praktisch `.env`), keine Variablen darin | sonst liest Compose einen beliebigen Host-Pfad und inlined ihn nach `environment:` |
@@ -769,7 +769,7 @@ gespiegelt). Verbindliche Quelle: `apps/converge-kernel/backend/src/services/com
 
 **Standard-Stack (3 Container):**
 - `database` service: only on `app-internal`, **never** `converge-net`
-- `frontend` service: darf als **einziger** Service ein `ports:`-Mapping haben — höchstens eines im ganzen Stack, Host-Port ≥ 1024 (`FRONTEND_PORT`-Variable). Der Kernel lehnt jeden anderen veröffentlichten Port ab (siehe „Compose-Allowlist des Kernels")
+- `frontend` service: darf als **einziger** Service ein `ports:`-Mapping haben — höchstens eines im ganzen Stack, Host-Port ≥ 1024, gebunden an `127.0.0.1` (`"127.0.0.1:${FRONTEND_PORT}:8080"`). Der Kernel lehnt jeden anderen veröffentlichten Port sowie jede andere Bindeadresse ab (siehe „Compose-Allowlist des Kernels")
 - `backend` service: `expose:` only (no host port needed)
 - Build context in `docker-compose.yml`: repo root (so one context sees both `backend/` + `frontend/` package*.json + src; `@efa-one/sdk` comes via `npm ci`)
 

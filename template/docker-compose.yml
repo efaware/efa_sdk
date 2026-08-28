@@ -101,7 +101,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "${FRONTEND_PORT:-6800}:8080"   # Host port for Converge iframe access; container lauscht non-root auf 8080
+      - "127.0.0.1:${FRONTEND_PORT:-6800}:8080"   # Nur lokal auf der VPS erreichbar (Fund #15, Stufe P2); container lauscht non-root auf 8080
     networks:
       - converge-net
       - app-internal
