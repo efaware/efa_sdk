@@ -6,19 +6,10 @@ name: Dependabot auto-merge
 # nichts und publiziert nichts — den npm-Publish löst ausschließlich ein v*-Tag aus
 # (publish.yml). Der Maintainer taggt weiterhin von Hand.
 #
-# ⚠️ AKTUELL RUHEND: Der Job ist hinter der Repo-Variable ENABLE_AUTOMERGE gated und wird
-# übersprungen (kein roter Check, kein Runner-Verbrauch), bis die Voraussetzungen erfüllt
-# sind. Anders als beim (privaten) Kernel scheitert es hier NICHT am Plan — efa-sdk ist
-# public, dort sind Auto-merge und Branch-Protection auch im Free-Plan verfügbar:
-#   1) Repo-Setting „Allow auto-merge" an:
-#      gh api -X PATCH repos/efaware/efa_sdk -F allow_auto_merge=true
-#   2) Branch-Protection auf `main` mit den Checks als "required"
-#      (sdk / npm audit / License gate / Trivy) — sonst hat Auto-merge kein CI-Gate und
-#      mergt ungeprüft in den Branch, von dem released wird.
-#   3) Aktivieren:
-#      gh variable set ENABLE_AUTOMERGE --body true --repo efaware/efa_sdk
-#
-# Merge-Methode: SQUASH — Squash-Merges müssen im Repo erlaubt sein (Default an).
+# AKTIV seit 31.08.2026 (Notion #139): `allow_auto_merge` an, Ruleset „main-protection"
+# mit den 11 CI-Checks (sdk / npm audit / License gate / Trivy) als required, Secret-
+# Scanning + Push-Protection + CodeQL-Default-Setup an, `ENABLE_AUTOMERGE`-Variable
+# gesetzt. Merge-Methode: SQUASH — Squash-Merges müssen im Repo erlaubt sein (Default an).
 on:
   pull_request:
     branches: [main]
