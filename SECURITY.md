@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report security issues **privately** through GitHub's private vulnerability
-reporting: go to the [Security tab](https://github.com/convergeplattform/efa-sdk/security)
+reporting: go to the [Security tab](https://github.com/efaware/efa_sdk/security)
 and choose *Report a vulnerability*. That opens a private advisory visible only to
 the maintainers.
 

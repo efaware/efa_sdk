@@ -5,7 +5,7 @@ Verzeichnis und passt die Business-Logik an. Die gesamte Infrastruktur (Auth, Di
 Audit/Reporting, IPC, i18n) kommt fertig aus dem npm-Paket [`@efa-one/sdk`](https://www.npmjs.com/package/@efa-one/sdk)
 — du schreibst nur die App-Logik.
 
-> Dieses Verzeichnis liegt im [`efa-sdk`](https://github.com/convergeplattform/efa-sdk)-Repo.
+> Dieses Verzeichnis liegt im [`efa-sdk`](https://github.com/efaware/efa_sdk)-Repo.
 > Eine App lässt sich **allein daraus** aufsetzen — der `/new-app`-Skill automatisiert die
 > Schritte unten nur für Claude-Code-Nutzer, ist aber nicht erforderlich.
 
@@ -40,8 +40,8 @@ Die Plattform verarbeitet beide identisch (Discovery, Gateway-Routing, Auth). En
 ## So baust du eine neue App
 
 ```bash
-git clone https://github.com/convergeplattform/efa-sdk
-cp -R efa-sdk/template efa-myapp        # Scaffold herauskopieren
+git clone https://github.com/efaware/efa_sdk
+cp -R efa_sdk/template efa-myapp        # Scaffold herauskopieren
 cd efa-myapp && rm -rf .git && git init # frische Git-Historie
 npm --prefix backend install
 npm --prefix frontend install
