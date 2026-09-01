@@ -18,6 +18,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -63,6 +64,7 @@ jobs:
             type=ref,event=tag
 
       - name: Build & push backend
+        id: build_backend
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -72,6 +74,7 @@ jobs:
           labels: ${{ steps.meta_backend.outputs.labels }}
 
       - name: Build & push frontend
+        id: build_frontend
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -81,3 +84,12 @@ jobs:
           push: true
           tags: ${{ steps.meta_frontend.outputs.tags }}
           labels: ${{ steps.meta_frontend.outputs.labels }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign backend image
+        run: cosign sign --yes "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}-backend@${{ steps.build_backend.outputs.digest }}"
+
+      - name: Sign frontend image
+        run: cosign sign --yes "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}-frontend@${{ steps.build_frontend.outputs.digest }}"
