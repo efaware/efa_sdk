@@ -86,6 +86,14 @@ jobs:
       - name: Image frisch aus GHCR ziehen
         run: docker pull "${{ env.IMAGE }}"
 
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Cosign verify (blockierend)
+        run: |
+          cosign verify "${{ env.IMAGE }}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github.com/(efaware|convergeplattform)/[^/]+/\.github/workflows/docker-image.*\.yml@'
+
       # HARTER GATE: CRITICAL blockiert den Check — inkl. unfixed. `ignore-unfixed:
       # false` ist hier bewusst gesetzt (Gegenteil zum fs-Scan): eine EOL-Runtime
       # produziert per Definition CVEs OHNE Fix — würde man die ignorieren, wäre
