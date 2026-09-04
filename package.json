@@ -105,7 +105,7 @@
     }
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.5",
+    "@eslint/js": "^10.0.1",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-dropdown-menu": "^2.1.4",
     "@radix-ui/react-tooltip": "^1.1.6",
@@ -118,7 +118,7 @@
     "@types/supertest": "^7.2.0",
     "@vitest/coverage-v8": "^4.1.11",
     "cookie-parser": "^1.4.6",
-    "eslint": "^9.39.5",
+    "eslint": "^10.9.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "express": "^4.19.2",
     "i18next": "^23.11.0",
