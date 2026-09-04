@@ -122,7 +122,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "express": "^4.19.2",
     "i18next": "^23.11.0",
-    "i18next-http-backend": "^2.7.3",
+    "i18next-http-backend": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.577.0",
     "pg": "^8.12.0",
