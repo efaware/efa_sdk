@@ -11,7 +11,14 @@ name: Image Vulnerability Scan
 # "dieses Tag NICHT über den Deployer ausrollen". Das Image liegt dann zwar schon
 # in der GHCR, aber der Deploy ist manuell — der rote Check ist das Gate.
 #
-# Kanonische Vorlage — 1:1 (ohne Änderung) in jedes App-/System-Repo kopieren.
+# ── Bewusst NICHT die kanonische Fassung aus converge_meta ────────────────────
+# `ci/templates/shared/image-scan.yml` scannt `sha-<kurz>` bzw. `:main` — das
+# setzt den trunk-based Build der efaware-Repos voraus. Dieses Template baut
+# weiterhin NUR auf `v*`-Tags und pusht `:latest` + `:vX.Y.Z`; ein sha-Tag
+# existiert dort gar nicht, der Pull liefe in einen 404 und der Gate waere ab
+# Tag 1 dauerhaft rot. Deshalb behaelt diese Datei ihre eigene Tag-Logik und
+# gilt im Standard als Tier 2. Zieht das Template auf trunk-based um, kann sie
+# durch die kanonische Fassung ersetzt werden.
 # Der Job erkennt selbst, welche Images das Repo baut (backend / frontend /
 # gateway), indem er den Build-Workflow ausliest — funktioniert für Single-,
 # 3-Container- und Kernel-Layout ohne Anpassung.
@@ -26,11 +33,22 @@ permissions:
   contents: read
   packages: read
 
+# Trivy zieht seine Vuln-DB per Default vom GCR-Mirror
+# (mirror.gcr.io/aquasec/trivy-db), der zeitweise 404 liefert und den Scan-Job
+# hart fehlschlagen laesst (kein echtes Finding, reiner Infra-Flake). Auf die
+# kanonische GHCR-Quelle zeigen — stabiler, oeffentlich anonym ziehbar.
+env:
+  TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+
 jobs:
   detect:
     # Nur laufen, wenn der Build erfolgreich war (sonst gibt es kein Image),
-    # oder bei manuellem Start.
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # oder bei manuellem Start. PR-Builds sind ausgenommen: die bauen bewusst
+    # OHNE Push (reiner Merge-Gate), es liegt also gar kein Image in der GHCR.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.workflow_run.conclusion == 'success' &&
+           github.event.workflow_run.event != 'pull_request') }}
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     outputs:
       suffixes: ${{ steps.d.outputs.suffixes }}
@@ -40,7 +58,11 @@ jobs:
         name: Welche Images baut dieses Repo?
         run: |
           SUF=()
-          for s in backend frontend gateway; do
+          # Die Suffix-Liste MUSS jedes Image enthalten, das die App baut — ein
+          # hier fehlendes Suffix wird nie gescannt, obwohl der Build es pusht UND
+          # signiert (09/2026: converge-ai `sandbox` lief so monatelang ungescannt
+          # mit). Neues Image-Target im Build -> hier ergaenzen.
+          for s in backend frontend gateway sandbox; do
             if grep -rqE "IMAGE_BASE[^A-Za-z0-9_]*-${s}([^A-Za-z0-9_]|$)" .github/workflows/docker-image*.yml 2>/dev/null; then
               SUF+=("\"$s\"")
             fi
