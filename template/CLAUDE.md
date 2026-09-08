@@ -58,6 +58,20 @@ Keine `DEPENDENCIES.md` pflegen — der Dependency-Nachweis lebt in `package-loc
 `license-checker` — Copyleft GPL/AGPL/LGPL failt den Build). Der einzige manuelle
 Schritt ist die Notwendigkeitsfrage (Punkt 1).
 
+#### `overrides` in `backend/package.json` — warum, und wann sie wieder weg darf
+
+`package.json` kennt keine Kommentare, deshalb steht die Begründung hier. Ein
+`overrides`-Eintrag ist immer eine **bewusste Abweichung von dem, was ein Paket
+selbst verlangt** — er gehört dokumentiert, sonst wird er später entweder blind
+entfernt (Lücke kommt zurück) oder ewig mitgeschleppt.
+
+| Override | Grund | Weg, sobald … |
+|---|---|---|
+| `qs: ^6.16.0` | express 4 pinnt `~6.15.1`; die beiden offenen qs-Advisories ([GHSA-4mjr-xmp4-gh2g](https://github.com/advisories/GHSA-4mjr-xmp4-gh2g) DoS, [GHSA-x5fp-wj9c-mxmx](https://github.com/advisories/GHSA-x5fp-wj9c-mxmx) array-limit-Bypass) sind erst ab **6.16.0** gefixt. Auf der express-4-Linie ist der Fix also **nicht erreichbar** — die Plattform hält express 4 aber bewusst (siehe Ignore-Regel in `.github/dependabot.yml`). | express eine 4.x-Version mit `qs >= 6.16.0` ausliefert (oder die Plattform auf express 5 geht) |
+
+Vor dem Entfernen eines Overrides immer prüfen, ob das ursprüngliche Problem wirklich
+behoben ist — `npm ls qs` zeigt die aufgelöste Version, `npm audit` die Advisories.
+
 ### Auth is handled – do not re-implement it
 - Frontend: use `useConvergeAuth()` hook → provides `{ user, theme, isReady }`
 - Backend: protect routes with `requireAuth` / `requireAdmin` from `./middleware/auth`

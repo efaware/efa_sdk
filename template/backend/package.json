@@ -25,7 +25,7 @@
     "better-sqlite3": "^13.0.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/cookie-parser": "^1.4.7",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
@@ -41,7 +41,7 @@
     "typescript": "6.0.3",
     "vitest": "^4.1.4"
   },
-  "allowScripts": {
-    "better-sqlite3@12.11.1": true
+  "overrides": {
+    "qs": "^6.16.0"
   }
 }

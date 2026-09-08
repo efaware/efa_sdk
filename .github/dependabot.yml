@@ -167,6 +167,14 @@ updates:
         update-types: ["version-update:semver-major"]
       # react-router bleibt auf v6: v7 zieht das Data-Router-Modell nach und würde
       # den HashRouter-Deeplink-Vertrag der eingebetteten Apps berühren.
+      #
+      # BEIDE Namen nötig: `react-router-dom` ist die direkte Dependency, aber
+      # Dependabot öffnet den Major als *ancestor update* mit `react-router` als
+      # primärem Paket („bump react-router and update ancestor dependency
+      # react-router-dom"). Stand nur `react-router-dom` hier, griff die Regel
+      # nicht und der PR kam trotzdem (#30).
+      - dependency-name: "react-router"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "react-router-dom"
         update-types: ["version-update:semver-major"]
       # lucide-react folgt der SDK-peer-Untergrenze (>=0.400.0).
