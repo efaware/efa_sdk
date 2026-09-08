@@ -42,8 +42,18 @@ WORKDIR /app
 # unkritisch) — hier zählt nur, dass der LAUFENDE Prozess kein root ist.
 RUN addgroup -S app && adduser -S app -G app
 
-# better-sqlite3 ist ein Native-Modul; Alpine/musl hat keine Prebuilds, daher
-# Build-Toolchain temporär installieren, kompilieren, wieder entfernen.
+# better-sqlite3 ist ein Native-Modul: Build-Toolchain temporär installieren,
+# kompilieren, wieder entfernen.
+#
+# Seit better-sqlite3 13 liegt ein passendes musl-Prebuild (`prebuilds/
+# linuxmusl-x64.node`) IM Tarball — kompiliert werden müsste also nicht mehr.
+# Das Paket führt aber weiterhin ein node-gyp-Install-Script aus, und weil es
+# eine `optionalDependency` ist, wirft `npm ci` das Paket bei dessen Fehlschlag
+# KOMMENTARLOS weg (Exit 0, danach `MODULE_NOT_FOUND` zur Laufzeit). Die
+# Toolchain hier ist deshalb kein Kompilier-, sondern ein Überlebens-Bedarf.
+# Alternative wäre `npm ci --ignore-scripts` (nutzt das Prebuild, spart ~150 MB
+# Build-Layer) — schaltet aber die Install-Scripts ALLER Pakete ab und ist
+# deshalb eine bewusste, template-weite Entscheidung, kein Nebenbei-Fix.
 COPY --from=backend-build /app/backend/package*.json ./
 # npm nach dem Prod-Install entfernen (Runtime startet mit `node`): beseitigt
 # CVE-2026-59873 (node-tar im gebündelten npm des Base-Images) + Angriffsfläche.
