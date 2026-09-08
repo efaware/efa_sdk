@@ -19,7 +19,15 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  # Compile-/Test-Gate im SELBEN Lauf wie der Build: ein `v*`-Tag darf kein Image
+  # erzeugen, dessen tsc/Vitest/ESLint rot sind. `needs: checks` ist hier wichtiger
+  # als in den trunk-based Repos — den Tag-Push schuetzt kein Ruleset, es gibt also
+  # keine zweite Instanz, die den Gate erzwingen wuerde.
+  checks:
+    uses: ./.github/workflows/build-check.yml
+
   build-and-push:
+    needs: checks
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -1,12 +1,16 @@
 name: Security & License Scan
 
-# Ergänzt den reinen Build-Workflow (docker-image.yml, nur Tag-Push) um
-# kontinuierliche Dependency-Prüfung: auf jeden Push/PR + wöchentlich.
-# Kanonische Vorlage — wird per cp -R in jede neue App kopiert.
+# ── KANONISCHE DATEI — nicht pro Repo editieren ──────────────────────────────
+# Quelle: converge_meta `ci/templates/shared/security.yml`.
+# Verteilt via `ci/sync-ci.sh --apply`. Lokale Edits werden beim nächsten Sync
+# überschrieben; Änderungen gehören in die Quelle im Meta-Repo.
+#
+# Ergänzt den reinen Build-Workflow (docker-image.yml) um kontinuierliche
+# Dependency-Prüfung: auf jeden Push/PR + wöchentlich.
 
 on:
   push:
-    branches: [main, developement]
+    branches: [main]
   pull_request:
   schedule:
     - cron: "0 6 * * 1"   # montags 06:00 UTC
@@ -15,10 +19,31 @@ on:
 permissions:
   contents: read
 
+# Mehrere Pushes in denselben PR sonst stapeln volle Scan-Läufe.
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Trivy zieht seine Vuln-DB per Default vom GCR-Mirror
+  # (mirror.gcr.io/aquasec/trivy-db), der zeitweise 404 liefert und den Scan-Job
+  # hart fehlschlagen lässt (kein echtes Finding, reiner Infra-Flake). Auf die
+  # kanonische GHCR-Quelle zeigen — stabiler, öffentlich anonym ziehbar.
+  TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+  # Trivy überspringt in npm-Lockfiles per Default die devDependencies — ohne
+  # diesen Schalter ist der fs-Scan für die Build-/Test-Toolchain strukturell
+  # blind (z. B. eine CVE in einem Dev-Tool, das trotzdem im Image landet).
+  TRIVY_INCLUDE_DEV_DEPS: true
+
 jobs:
+  # Nur wöchentlich + manuell: `npm audit` blockiert sonst auch für
+  # devDependency-CVEs, die nie ins Image kommen (die vollständige, blockierende
+  # Prüfung macht `trivy fs` unten inkl. Dev-Deps über TRIVY_INCLUDE_DEV_DEPS).
+  # Informativ, kein Merge-Blocker mehr auf jedem Push/PR.
   npm-audit:
-    name: npm audit (${{ matrix.dir }})
-    runs-on: ubuntu-latest
+    name: npm audit (${{ matrix.dir }}, informativ)
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -28,14 +53,15 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      # Hard-Fail bei HIGH + CRITICAL. Verbleibende Moderate/Low stehen im BACKLOG.
+      # --omit=dev: devDependency-CVEs landen nie im Image, das blockierende
+      # Gate ist `trivy fs` (inkl. Dev-Deps) — hier nur der Runtime-Anteil.
       - name: npm audit
         working-directory: ${{ matrix.dir }}
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
 
   licenses:
     name: License gate (${{ matrix.dir }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -48,24 +74,39 @@ jobs:
       - name: Install (prod only, no scripts)
         working-directory: ${{ matrix.dir }}
         # npm install (nicht ci) — tolerant gegen Lockfile-Drift; CI-Install ist ephemer.
-        # --legacy-peer-deps: i18next@26 deklariert peerOptional typescript@"^5||^6",
-        # die Repos pinnen aber TS 7.0.2 (CLAUDE.md) → sonst ERESOLVE (wie in den
-        # Frontend-Dockerfiles, die denselben Flag nutzen). Rein für die License-Analyse.
+        # --legacy-peer-deps: einzelne Pakete deklarieren peerOptional-TypeScript-Ranges,
+        # die den plattformweiten TS-Pin (CLAUDE.md) nicht einschließen → sonst ERESOLVE
+        # (wie in den Frontend-Dockerfiles, die denselben Flag nutzen).
+        # Rein für die License-Analyse.
         run: npm install --omit=dev --ignore-scripts --no-audit --no-fund --legacy-peer-deps
       - name: License summary (informativ)
         working-directory: ${{ matrix.dir }}
-        run: npx --yes license-checker --production --summary
-      # Hard-Fail nur bei echtem Copyleft (GPL/AGPL/LGPL). Permissive Lizenzen
-      # (MIT/Apache/ISC/BSD/MPL/OFL) sind erlaubt. Strenger via --onlyAllow möglich.
-      - name: Fail on copyleft
+        run: npx --yes license-checker --production --excludePrivate --summary
+      # ── ALLOWLIST, keine Blacklist ────────────────────────────────────────
+      # Bis 09/2026 stand hier `--failOn "GPL;AGPL;LGPL;…"`. Eine Blacklist lässt
+      # per Konstruktion alles durch, was nicht auf ihr steht — also SSPL, BUSL-1.1,
+      # Elastic-2.0, CC-BY-NC, PolyForm und jedes Paket ganz ohne Lizenzfeld
+      # (`UNKNOWN`). Für ein Self-Hosted-Produkt beim Kunden ist genau diese Klasse
+      # mindestens so heikel wie Copyleft. `--onlyAllow` dreht die Beweislast um:
+      # eine neue Lizenz muss hier bewusst eingetragen werden.
+      #
+      # Compound-Strings ("(MPL-2.0 OR Apache-2.0)") müssen wörtlich in der Liste
+      # stehen — license-checker vergleicht den gemeldeten String, er löst den
+      # SPDX-Ausdruck nicht auf. Ein angehängtes `*` (Lizenz aus der LICENSE-Datei
+      # geraten statt deklariert, z. B. `MIT*`) wird beim Vergleich ignoriert.
+      #
+      # --excludePrivate: das Repo-eigene Paket meldet sich als UNLICENSED/UNKNOWN.
+      # Voraussetzung: jede App-package.json trägt `"private": true` (gehört ohnehin
+      # dahin — verhindert ein versehentliches `npm publish`).
+      - name: Fail on non-permissive license
         working-directory: ${{ matrix.dir }}
         run: >
-          npx --yes license-checker --production
-          --failOn "GPL-1.0-only;GPL-1.0-or-later;GPL-2.0-only;GPL-2.0-or-later;GPL-3.0-only;GPL-3.0-or-later;AGPL-1.0-only;AGPL-1.0-or-later;AGPL-3.0-only;AGPL-3.0-or-later;LGPL-2.0-only;LGPL-2.1-only;LGPL-2.1-or-later;LGPL-3.0-only;LGPL-3.0-or-later"
+          npx --yes license-checker --production --excludePrivate
+          --onlyAllow "MIT;MIT-0;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;MPL-2.0;OFL-1.1;Unlicense;CC0-1.0;BlueOak-1.0.0;Python-2.0;(MPL-2.0 OR Apache-2.0)"
 
   trivy:
     name: Trivy filesystem scan
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
       # Scannt Lockfiles (npm) + Dockerfiles auf bekannte CVEs.
@@ -93,20 +134,35 @@ jobs:
           ignore-unfixed: false
           exit-code: 0
 
-  trivy-config:
-    name: Trivy misconfig & secret scan (report-only)
-    runs-on: ubuntu-latest
+  trivy-secrets:
+    name: Trivy secret scan (blockierend)
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
-      # Prüft Dockerfiles + docker-compose auf Härtungslücken (root-User, fehlendes
-      # cap_drop/read_only, ungepinnte Images) und versehentlich eingecheckte Secrets.
-      # exit-code 0 = report-only: sichtbar machen, ohne day-1 jeden Build zu brechen.
-      # Nach Abarbeitung der Härtung auf exit-code 1 hochziehen.
-      - name: Trivy config/secret scan
+      # Versehentlich eingecheckte Secrets sind selten False-Positives — anders
+      # als der Misconfig-Scan (unten) blockiert dieser hier den Merge.
+      - name: Trivy secret scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
-          scanners: misconfig,secret
+          scanners: secret
+          severity: HIGH,CRITICAL
+          exit-code: 1
+
+  trivy-config:
+    name: Trivy misconfig scan (report-only)
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      # Prüft Dockerfiles + docker-compose auf Härtungslücken (root-User, fehlendes
+      # cap_drop/read_only, ungepinnte Images). exit-code 0 = report-only: sichtbar
+      # machen, ohne jeden Build zu brechen, solange die Container-Härtung noch läuft.
+      - name: Trivy misconfig scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: misconfig
           severity: HIGH,CRITICAL
           exit-code: 0

@@ -16,6 +16,23 @@
 # Grouping: alle minor/patch-Updates pro Verzeichnis in EINEN PR → 1 PR/Woche statt vieler.
 # Major-Updates kommen als EINZELNE PRs (bewusste manuelle Review) — mit einer Ausnahme:
 # die ESLint-Familie muss gemeinsam springen (siehe Kommentar beim eslint-Major-Block).
+#
+# ── Cooldown (Mindest-Release-Alter) ────────────────────────────────────────
+# Dependabot oeffnet fuer eine neue Version erst NACH Ablauf des Cooldowns einen
+# PR. Das ist die eigentliche Absicherung hinter dem Auto-merge in
+# .github/workflows/dependabot-automerge.yml: fuer eine frisch kompromittierte
+# Paketversion existiert noch kein CVE-Eintrag, den Trivy oder `npm audit` kennen
+# koennten — alle Checks waeren gruen und der PR wuerde unbeaufsichtigt bis ins
+# signierte Image durchlaufen. GitHubs Default liegt seit 07/2026 bei 3 Tagen;
+# wir heben auf 7 an (14 fuer Majors), weil patch/minor hier ohne Menschen mergen.
+#
+# WICHTIG: Der Cooldown gilt ausschliesslich fuer VERSION-Updates. Security-
+# Updates aus Dependabot-Alerts laufen bewusst ungebremst durch — ein CVE-Fix
+# soll sofort kommen.
+#
+# Zeitplan-Policy (plattformweit, ci/README.md): npm weekly, docker +
+# github-actions monthly — die beiden bewegen sich langsam und erzeugen
+# woechentlich vor allem Rauschen, das die npm-PRs zudeckt.
 version: 2
 updates:
   # --- npm: das SDK selbst ---
@@ -23,6 +40,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+      semver-patch-days: 7
+      semver-minor-days: 7
+      semver-major-days: 14
     open-pull-requests-limit: 10
     groups:
       minor-and-patch:
@@ -91,6 +113,11 @@ updates:
     directory: /template/backend
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+      semver-patch-days: 7
+      semver-minor-days: 7
+      semver-major-days: 14
     open-pull-requests-limit: 10
     groups:
       minor-and-patch:
@@ -114,6 +141,11 @@ updates:
     directory: /template/frontend
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+      semver-patch-days: 7
+      semver-minor-days: 7
+      semver-major-days: 14
     open-pull-requests-limit: 10
     groups:
       minor-and-patch:
@@ -154,7 +186,9 @@ updates:
       - /template/backend
       - /template/frontend
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7
     groups:
       minor-and-patch:
         patterns: ["*"]
@@ -171,7 +205,9 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]
@@ -185,7 +221,9 @@ updates:
   - package-ecosystem: github-actions
     directory: /template/.github/workflows
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]

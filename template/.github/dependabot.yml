@@ -4,6 +4,23 @@
 #
 # Layout: 3-Container-Stack (eigene Dockerfiles in backend/ + frontend/).
 # Single-Container-Apps setzen die docker-Blöcke auf `directory: "/"` (Dockerfile.single).
+#
+# ── Cooldown (Mindest-Release-Alter) ────────────────────────────────────────
+# Dependabot oeffnet fuer eine neue Version erst NACH Ablauf des Cooldowns einen
+# PR. Das ist die eigentliche Absicherung hinter dem Auto-merge in
+# .github/workflows/dependabot-automerge.yml: fuer eine frisch kompromittierte
+# Paketversion existiert noch kein CVE-Eintrag, den Trivy oder `npm audit` kennen
+# koennten — alle Checks waeren gruen und der PR wuerde unbeaufsichtigt bis ins
+# signierte Image durchlaufen. GitHubs Default liegt seit 07/2026 bei 3 Tagen;
+# wir heben auf 7 an (14 fuer Majors), weil patch/minor hier ohne Menschen mergen.
+#
+# WICHTIG: Der Cooldown gilt ausschliesslich fuer VERSION-Updates. Security-
+# Updates aus Dependabot-Alerts laufen bewusst ungebremst durch — ein CVE-Fix
+# soll sofort kommen.
+#
+# Zeitplan-Policy (plattformweit, ci/README.md): npm weekly, docker +
+# github-actions monthly — die beiden bewegen sich langsam und erzeugen
+# woechentlich vor allem Rauschen, das die npm-PRs zudeckt.
 version: 2
 updates:
   # --- npm: Backend ---
@@ -11,6 +28,11 @@ updates:
     directory: /backend
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+      semver-patch-days: 7
+      semver-minor-days: 7
+      semver-major-days: 14
     open-pull-requests-limit: 10
     groups:
       backend-dev:            # devDependencies gebündelt = weniger PR-Rauschen
@@ -21,6 +43,11 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+      semver-patch-days: 7
+      semver-minor-days: 7
+      semver-major-days: 14
     open-pull-requests-limit: 10
     groups:
       frontend-dev:
@@ -30,14 +57,20 @@ updates:
   - package-ecosystem: docker
     directory: /backend
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7
   - package-ecosystem: docker
     directory: /frontend
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7
 
   # --- GitHub-Actions (actions/checkout, trivy-action, …) ---
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    cooldown:
+      default-days: 7

@@ -1,0 +1,114 @@
+name: Build Check
+
+# PR-/Push-Gate: spiegelt die Compile-Schritte der Dockerfiles + Vitest + ESLint,
+# damit ein stiller Build-/Lint-/Test-Break nicht erst beim Image-Build auffällt.
+# Ergänzt security.yml (CVE/Lizenz) + docker-image.yml (Container-Gate).
+#
+#   backend             -> npm ci + tsc --noEmit (Prod + Testcode) + vitest (Coverage-Gate) + eslint
+#   backend-integration -> npm ci + Testcontainers/Postgres (DB-Integration)
+#   frontend            -> npm ci + npm run build (tsc + vite) + vitest (Coverage-Gate) + eslint
+#
+# ── Die Job-Namen sind Vertrag ──────────────────────────────────────────────
+# Sie sind zugleich die Required-Status-Check-Kontexte im `main-protection`-Ruleset
+# (converge_meta `ci/templates/ruleset-app.json`). Wer hier umbenennt, ohne das
+# Ruleset mitzuziehen, blockiert `main` dauerhaft — der alte Kontext meldet nie
+# wieder, und ein nie meldender Required Check laesst keinen PR mehr durch.
+#
+# Deshalb laufen die Schritte mit `--if-present`: ein frisch gescaffoldetes Repo
+# bringt noch kein `lint` und kein `test:integration` mit. Der Job existiert
+# trotzdem, meldet seinen Kontext und wird gruen — und faengt automatisch an zu
+# pruefen, sobald die App das jeweilige npm-Script ergaenzt. Ohne diesen Kniff
+# muesste jede neue App entweder mit rotem Gate starten oder mit einem eigenen,
+# abweichenden Ruleset — beides genau die Drift, die der Standard verhindert.
+#
+# Auf Push nach main wird dieser Gate NICHT eigenstaendig getriggert, sondern als
+# `checks`-Job aus docker-image.yml heraus aufgerufen (workflow_call) — so faellt
+# "Build UND Tests gruen" in EINEN Workflow-Lauf zusammen. Auf PRs laeuft er
+# weiter eigenstaendig (Merge-Gate / required check).
+on:
+  workflow_call:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: backend (tsc + test + lint)
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install
+        run: npm ci
+        working-directory: backend
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.json
+        working-directory: backend
+      # Vitest transpiliert per esbuild und prueft dabei KEINE Typen — die
+      # tsconfig.json klammert den Testcode ausserdem aus (er darf nie ins dist).
+      # Ohne diesen zusaetzlichen Pass bleiben Typfehler im Testcode unentdeckt.
+      - name: Typecheck (Testcode)
+        run: npm run typecheck:test --if-present
+        working-directory: backend
+      - name: Test (Vitest + Coverage-Gate)
+        run: npm run test:coverage --if-present
+        working-directory: backend
+      - name: Lint (ESLint)
+        run: npm run lint --if-present
+        working-directory: backend
+
+  backend-integration:
+    name: backend-integration (Testcontainers/Postgres)
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install
+        run: npm ci
+        working-directory: backend
+      # Testcontainers startet postgres:16-alpine selbst ueber den Runner-Docker-Daemon
+      # (kein services:-Block noetig) — identisch zu lokal `npm run test:integration`.
+      # Single-Container-Apps (SQLite) haben kein solches Script: --if-present
+      # laesst den Job dann gruen durchlaufen, statt den Gate zu blockieren.
+      - name: DB-Integration (Testcontainers)
+        run: npm run test:integration --if-present
+        working-directory: backend
+
+  frontend:
+    name: frontend (build + test + lint)
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        run: npm ci
+        working-directory: frontend
+      # Typecheck ueber den GESAMTEN src inkl. Tests. Faengt Test-Typfehler HIER
+      # ab — NICHT im Image-Build, der ohne Tests laeuft.
+      - name: Typecheck inkl. Tests
+        run: npm run typecheck --if-present
+        working-directory: frontend
+      # Build exakt wie im Frontend-Docker-Target.
+      - name: Build (tsc + vite, wie im Dockerfile)
+        run: npm run build
+        working-directory: frontend
+      - name: Test (Vitest + Coverage-Gate)
+        run: npm run test:coverage --if-present
+        working-directory: frontend
+      - name: Lint (ESLint)
+        run: npm run lint --if-present
+        working-directory: frontend

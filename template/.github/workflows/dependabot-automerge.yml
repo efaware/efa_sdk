@@ -1,0 +1,66 @@
+name: Dependabot auto-merge
+
+# ── KANONISCHE DATEI — nicht pro Repo editieren ──────────────────────────────
+# Quelle: converge_meta `ci/templates/shared/dependabot-automerge.yml`.
+# Verteilt via `ci/sync-ci.sh --apply`. Lokale Edits werden beim naechsten Sync
+# ueberschrieben; Aenderungen gehoeren in die Quelle im Meta-Repo.
+#
+# Aktiviert GitHub-Auto-merge für Dependabot-PRs (NUR patch/minor) auf `main`,
+# sobald die required Checks (build-check.yml + docker-image.yml + security.yml)
+# grün sind. Majors werden NIE auto-gemerged — die kommen laut dependabot.yml
+# ohnehin einzeln (kein Grouping), bewusste manuelle Review.
+#
+# Voraussetzung ist die Ruleset-Branch-Protection auf `main` (PR + 8 Required
+# Checks, kein Force-Push) — ohne die hätte Auto-merge kein CI-Gate und würde
+# ungeprüft in den Branch mergen, aus dem `:main`-Images gebaut werden.
+#
+# Merge-Methode: SQUASH — Squash-Merges müssen im Repo erlaubt sein (Default an).
+#
+# WICHTIG — Auto-merge trägt nur zusammen mit dem `cooldown:`-Block in
+# `.github/dependabot.yml`. Ohne ihn wäre dies der direkte Weg, auf dem eine
+# kompromittierte Patch-Version unbeaufsichtigt bis ins signierte Image läuft:
+# für eine frisch veröffentlichte Kompromittierung existiert noch kein
+# CVE-Eintrag, den Trivy oder `npm audit` kennen könnten — alle Checks sind
+# grün. Der Cooldown (Mindest-Release-Alter) ist die Bremse, nicht die CI.
+# Er gilt ausschließlich für Version-Updates; Security-Updates aus
+# Dependabot-Alerts laufen bewusst ungebremst durch.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: ${{ github.actor == 'dependabot[bot]' && vars.ENABLE_AUTOMERGE == 'true' }}
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    steps:
+      - name: Dependabot-Metadaten lesen
+        id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      # github-script statt `gh` CLI: läuft auch auf einem self-hosted Runner ohne
+      # vorinstalliertes gh. Tolerant — schlägt nicht rot fehl, falls Auto-merge im
+      # Repo (noch) nicht erlaubt ist (dann nur eine Warnung).
+      - name: Auto-merge (patch/minor) aktivieren
+        if: ${{ steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor' }}
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.graphql(
+                `mutation($id: ID!) {
+                  enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: SQUASH }) {
+                    pullRequest { number }
+                  }
+                }`,
+                { id: context.payload.pull_request.node_id }
+              );
+              core.info('Auto-merge aktiviert.');
+            } catch (e) {
+              core.warning('Auto-merge nicht aktiviert (Repo-Setting allow_auto_merge aus?): ' + e.message);
+            }

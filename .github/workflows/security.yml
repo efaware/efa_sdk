@@ -89,22 +89,28 @@ jobs:
         run: npm install --omit=dev --ignore-scripts --no-audit --no-fund
       - name: License summary (informativ)
         working-directory: ${{ matrix.dir }}
-        run: npx --yes license-checker --production --summary
-      # Hard-Fail nur bei echtem Copyleft (GPL/AGPL/LGPL). Permissive Lizenzen
-      # (MIT/Apache/ISC/BSD/MPL/OFL) sind erlaubt.
-      # ABWEICHUNG von der Kernel-Vorlage (bewusst): deren Liste enthält nur die
-      # modernen SPDX-IDs (`-only`/`-or-later`). Empirisch geprüft — license-checker
-      # vergleicht den gemeldeten Lizenz-String EXAKT, ein Paket mit dem verbreiteten
-      # Alt-String "GPL-3.0" rutscht dadurch glatt durch (Exit 0). Die veralteten
-      # Schreibweisen sind deshalb ergänzt. Substring-Fehlalarme gibt es nicht
-      # ("LGPL-3.0" matcht "GPL-3.0" nicht). Dual-Lizenzen wie "(MIT OR GPL-2.0)"
-      # erwischt failOn prinzipbedingt nicht — das ist akzeptiert, weil dort eine
-      # permissive Option existiert.
-      - name: Fail on copyleft
+        run: npx --yes license-checker --production --excludePrivate --summary
+      # ── ALLOWLIST, keine Blacklist ────────────────────────────────────────
+      # Bis 09/2026 stand hier `--failOn "GPL;AGPL;LGPL;…"`. Eine Blacklist laesst
+      # per Konstruktion alles durch, was nicht auf ihr steht — also SSPL, BUSL-1.1,
+      # Elastic-2.0, CC-BY-NC, PolyForm und jedes Paket ganz ohne Lizenzfeld
+      # (`UNKNOWN`). `--onlyAllow` dreht die Beweislast um: eine neue Lizenz muss
+      # hier bewusst eingetragen werden. Liste identisch zur kanonischen Fassung
+      # (converge_meta `ci/templates/shared/security.yml`) — sie gilt plattformweit.
+      #
+      # Compound-Strings ("(MPL-2.0 OR Apache-2.0)") muessen woertlich in der Liste
+      # stehen — license-checker vergleicht den gemeldeten String, er loest den
+      # SPDX-Ausdruck nicht auf. Ein angehaengtes `*` (Lizenz aus der LICENSE-Datei
+      # geraten statt deklariert, z. B. `MIT*`) wird beim Vergleich ignoriert.
+      #
+      # --excludePrivate: template/backend + template/frontend sind `private: true`
+      # und melden sich sonst als UNLICENSED. Das Repo-Root (@efa-one/sdk) ist NICHT
+      # private und deklariert korrekt Apache-2.0 — es laeuft regulaer durch das Gate.
+      - name: Fail on non-permissive license
         working-directory: ${{ matrix.dir }}
         run: >
-          npx --yes license-checker --production
-          --failOn "GPL-1.0-only;GPL-1.0-or-later;GPL-2.0-only;GPL-2.0-or-later;GPL-3.0-only;GPL-3.0-or-later;AGPL-1.0-only;AGPL-1.0-or-later;AGPL-3.0-only;AGPL-3.0-or-later;LGPL-2.0-only;LGPL-2.1-only;LGPL-2.1-or-later;LGPL-3.0-only;LGPL-3.0-or-later;GPL-1.0;GPL-2.0;GPL-3.0;GPL-2.0+;GPL-3.0+;AGPL-1.0;AGPL-3.0;AGPL-3.0+;LGPL-2.0;LGPL-2.1;LGPL-3.0;LGPL-2.1+;LGPL-3.0+"
+          npx --yes license-checker --production --excludePrivate
+          --onlyAllow "MIT;MIT-0;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;MPL-2.0;OFL-1.1;Unlicense;CC0-1.0;BlueOak-1.0.0;Python-2.0;(MPL-2.0 OR Apache-2.0)"
 
   trivy:
     name: Trivy filesystem scan
@@ -136,19 +142,37 @@ jobs:
           ignore-unfixed: false
           exit-code: 0
 
-  trivy-config:
-    name: Trivy misconfig & secret scan (report-only)
+  trivy-secrets:
+    name: Trivy secret scan (blockierend)
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
-      # Prüft die Scaffold-Dockerfiles auf Härtungslücken (root-User, fehlendes cap_drop,
-      # ungepinnte Images) und das Repo auf versehentlich eingecheckte Secrets.
-      # exit-code 0 = report-only: sichtbar machen, ohne day-1 jeden Build zu brechen.
-      - name: Trivy config/secret scan
+      # Angeglichen an die App-Repos (09/2026): versehentlich eingecheckte Secrets
+      # sind selten False-Positives und blockieren deshalb den Merge — anders als
+      # der Misconfig-Scan darunter. Vorher lief beides zusammen als report-only,
+      # ein echtes Secret waere hier also nur als gruene Notiz durchgelaufen.
+      - name: Trivy secret scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
-          scanners: misconfig,secret
+          scanners: secret
+          severity: HIGH,CRITICAL
+          exit-code: 1
+
+  trivy-config:
+    name: Trivy misconfig scan (report-only)
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      # Prueft die Scaffold-Dockerfiles auf Haertungsluecken (root-User, fehlendes
+      # cap_drop, ungepinnte Images). exit-code 0 = report-only: sichtbar machen,
+      # ohne jeden Build zu brechen, solange die Container-Haertung noch laeuft.
+      - name: Trivy misconfig scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: misconfig
           severity: HIGH,CRITICAL
           exit-code: 0
