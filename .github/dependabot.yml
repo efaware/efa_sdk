@@ -207,6 +207,24 @@ updates:
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
 
+  # --- Infra-Images im Scaffold-Compose (postgres) ---
+  # Der docker-Updater oben liest nur Dockerfiles; `image: postgres:…` in
+  # template/docker-compose.yml erfasst ausschließlich das Ökosystem `docker-compose`.
+  # App-Images mit ${IMAGE_REPOSITORY:-…}/${IMAGE_TAG:-…} überspringt der Parser
+  # (Default ohne Tag) — kein Pull-Versuch gegen die private ghcr-Org.
+  - package-ecosystem: docker-compose
+    directory: /template
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    ignore:
+      # Postgres-Major nie per Bot: jede App erbt die Linie, und 16 → 17 macht ein
+      # bestehendes Datenverzeichnis unlesbar. Linienwechsel ist eine bewusste
+      # Entscheidung (analog node-LTS oben); Digest-Updates laufen weiter.
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
+
   # --- GitHub-Actions (checkout, setup-node, trivy-action, …) ---
   # Wichtig hier: aquasecurity/trivy-action hat KEINEN mitwandernden Major-Tag, die
   # Workflows pinnen deshalb exakt (@v0.36.0). Ohne diesen Block veraltet der Pin still.

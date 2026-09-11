@@ -67,6 +67,24 @@ updates:
     cooldown:
       default-days: 7
 
+  # --- Infra-Images im Compose (postgres) ---
+  # Eigenes Ökosystem nötig: der docker-Updater liest nur Dockerfiles, `image:`-
+  # Zeilen in docker-compose*.yml erfasst er nicht. Die App-Images
+  # (${IMAGE_REPOSITORY:-…}-backend:${IMAGE_TAG:-…}) überspringt der Parser, weil der
+  # Default keinen Tag trägt — es bleibt nur `postgres`, mit Digest-Pin.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    ignore:
+      # Postgres-Major nie per Bot: 16 → 17 macht das Datenverzeichnis im Volume
+      # unlesbar (pg_upgrade bzw. Dump + Restore nötig). Digest-Updates innerhalb
+      # der Linie laufen weiter.
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
+
   # --- GitHub-Actions (actions/checkout, trivy-action, …) ---
   - package-ecosystem: github-actions
     directory: /
