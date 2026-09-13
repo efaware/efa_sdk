@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 
 /**
  * Dev-only routes. Registered in index.ts only when ENVIRONMENT !== 'production'.
@@ -34,8 +35,11 @@ router.get('/token', (req: Request, res: Response) => {
     },
     Buffer.from(privateKey, 'base64').toString('utf8'),
     // iss/aud müssen zum gehärteten Exchange-Verifier passen (Finding #9), sonst
-    // scheitert der lokale /dev/token-Login.
-    { algorithm: 'RS256', expiresIn: '8h', issuer: 'converge', audience: 'converge' },
+    // scheitert der lokale /dev/token-Login. jti: ab @efa-one/sdk 1.17 lehnt der
+    // Exchange Tokens ohne jti ab (Bindung an die Kernel-Sitzung, efa-Task #137).
+    // Geschützte Routen fragen den Sitzungsstatus dann live beim Kernel ab und
+    // antworten ohne laufenden Stack mit 503.
+    { algorithm: 'RS256', expiresIn: '8h', issuer: 'converge', audience: 'converge', jwtid: randomUUID() },
   );
 
   res.json({ token });

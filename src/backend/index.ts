@@ -16,6 +16,7 @@ export * from './mail';
 export * from './notifications';
 export * from './permissions';
 export * from './permissionClient';
+export * from './sessionStatusClient';
 export * from './permissionCheck';
 export * from './customPermissions';
 export * from './serviceClient';

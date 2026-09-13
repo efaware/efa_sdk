@@ -27,7 +27,11 @@ import { defineConfig } from 'vitest/config';
  * Config geprüft und bei einem toten Key hart abgebrochen.
  */
 const perFileThresholds = {
-  'src/backend/auth.ts': { lines: 63, statements: 61, functions: 66, branches: 50 },
+  // Ratchet efa-Task #137 (Live-Sitzungsprüfung): Ist L 80.8 / S 79.2 / F 80.6 / B 75.9.
+  'src/backend/auth.ts': { lines: 79, statements: 78, functions: 79, branches: 74 },
+  // Sicherheitskritisch (efa-Task #137): entscheidet, ob eine entwertete
+  // Kernel-Sitzung in der App noch durchkommt. Ist: 100 % in allen vier.
+  'src/backend/sessionStatusClient.ts': { lines: 100, statements: 100, functions: 100, branches: 95 },
   'src/backend/health.ts': { lines: 100, statements: 100, functions: 100, branches: 50 },
   'src/frontend/ipc.ts': { lines: 58, statements: 57, functions: 56, branches: 50 },
   'src/frontend/viewPreferences.ts': { lines: 25, statements: 22, functions: 35, branches: 28 },

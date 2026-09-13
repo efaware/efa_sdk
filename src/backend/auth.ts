@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Pool } from 'pg';
 import { getUserPermissions } from './permissionClient';
+import { getSessionStatus } from './sessionStatusClient';
 
 // Plattformweite JWT-Claims (Finding #9). Muss identisch zum Kernel
 // (`backend/src/jwtClaims.ts`) sein — dort signiert, hier verifiziert. Bewusst
@@ -20,6 +21,8 @@ export interface JwtPayload {
   iat: number;
   exp: number;
   forcePasswordChange?: boolean;
+  /** Token-ID. Jedes Kernel-Token trägt eine; Grundlage der Sitzungs-Entwertung. */
+  jti?: string;
 }
 
 export interface SessionPayload {
@@ -29,7 +32,20 @@ export interface SessionPayload {
   email: string | null;
   language?: string;
   tenant: string;
+  /**
+   * `jti` des eingetauschten Kernel-Tokens (seit 1.17.0, efa-Task #137).
+   * `requireAuth` fragt damit bei jedem Request den Live-Status der
+   * Kernel-Sitzung ab. Eine Sitzung ohne dieses Feld stammt von einem älteren
+   * SDK und wird mit 401 abgewiesen.
+   */
+  kernelJti: string;
+  /** `iat` des eingetauschten Kernel-Tokens in Sekunden (seit 1.17.0). */
+  kernelIat: number;
 }
+
+/** Format-Grenzen wie im Kernel-Endpoint `GET /api/internal/sessions/:jti/status`. */
+const KERNEL_JTI_RE = /^[A-Za-z0-9._:-]{1,128}$/;
+const KERNEL_SUB_RE = /^[A-Za-z0-9._:@-]{1,128}$/;
 
 export interface AuthRequest extends Request {
   user?: SessionPayload;
@@ -53,7 +69,7 @@ function getCookieName(): string {
   return process.env.APP_SESSION_COOKIE_NAME || 'app_session';
 }
 
-function setSessionCookie(res: Response, token: string): void {
+function setSessionCookie(res: Response, token: string, maxAgeMs: number): void {
   // secure-Flag (Finding #7): explizites COOKIE_SECURE gewinnt, sonst automatisch
   // in Produktion an. Verhindert, dass der app_session-Cookie in Prod über HTTP
   // ausgeliefert wird, wenn COOKIE_SECURE vergessen wurde. sameSite:'lax' blockt
@@ -64,7 +80,9 @@ function setSessionCookie(res: Response, token: string): void {
   res.cookie(getCookieName(), token, {
     httpOnly: true,
     sameSite: 'lax',
-    maxAge: 8 * 60 * 60 * 1000, // 8 hours
+    // So lange wie das eingetauschte Kernel-Token (efa-Task #137) — nicht mehr
+    // pauschal 8 h ab Exchange.
+    maxAge: maxAgeMs,
     secure,
     path: '/',
   });
@@ -73,8 +91,21 @@ function setSessionCookie(res: Response, token: string): void {
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
 /**
- * requireAuth – reads the httpOnly app_session cookie (signed with APP_SESSION_SECRET).
- * Attaches decoded payload to req.user. Synchronous — only verifies the JWT.
+ * requireAuth – reads the httpOnly app_session cookie (signed with APP_SESSION_SECRET)
+ * and checks the underlying kernel session live (efa-Task #137).
+ *
+ * Ablauf:
+ *   1. HS256-Verify des Cookies (Signatur + eigenes `exp`).
+ *   2. Sitzung ohne `kernelJti`/`kernelIat` (ausgestellt von SDK < 1.17) → 401.
+ *      Die App bekommt beim nächsten CONVERGE_AUTH (iframe-Neuladen) eine neue.
+ *   3. Live-Status beim Kernel (`sessionStatusClient.ts`, Cache 30 s):
+ *      entwertet → 401 `Session revoked`; Lookup fehlgeschlagen → 503
+ *      `Session service unavailable` (fail-closed, wie `requirePermission`).
+ *   4. Erst dann `req.user` setzen und `next()`.
+ *
+ * Asynchron: `next()` wird erst nach dem Lookup aufgerufen. Die Signatur
+ * `(req, res, next)` bleibt, darauf aufbauende Guards rufen `requireAuth` wie
+ * bisher im Callback-Stil auf.
  */
 export function requireAuth(req: AuthRequest, res: Response, next: NextFunction): void {
   const token: string | undefined = req.cookies?.[getCookieName()];
@@ -82,16 +113,45 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
     res.status(401).json({ error: 'Not authenticated' });
     return;
   }
+  let payload: SessionPayload & { exp?: number };
   try {
     // Algorithmus-Pin (Finding #9): app_session ist HS256 (symmetrisch). Ohne Pin
     // würde jwt.verify jeden im Token deklarierten Algorithmus akzeptieren — inkl.
     // RS/ES-„alg-confusion". Der Cookie wird nur gegen sich selbst validiert.
-    const payload = jwt.verify(token, getSessionSecret(), { algorithms: ['HS256'] }) as SessionPayload;
-    req.user = payload;
-    next();
+    payload = jwt.verify(token, getSessionSecret(), { algorithms: ['HS256'] }) as SessionPayload & { exp?: number };
   } catch {
     res.status(401).json({ error: 'Session invalid or expired' });
+    return;
   }
+  if (
+    typeof payload.kernelJti !== 'string' || !payload.kernelJti ||
+    typeof payload.kernelIat !== 'number' || typeof payload.exp !== 'number'
+  ) {
+    // Alt-Sitzung (vor SDK 1.17): an keine Kernel-Sitzung gebunden, also nicht
+    // entwertbar. Kein Fallback — die App tauscht beim nächsten CONVERGE_AUTH neu.
+    res.status(401).json({ error: 'Session invalid or expired' });
+    return;
+  }
+  const verified = payload;
+  getSessionStatus({
+    convergeId: verified.convergeId,
+    jti: verified.kernelJti,
+    iat: verified.kernelIat,
+    exp: verified.exp as number,
+  }).then(
+    (status) => {
+      if (!status.active) {
+        res.status(401).json({ error: 'Session revoked' });
+        return;
+      }
+      req.user = verified;
+      next();
+    },
+    (err: unknown) => {
+      console.error(JSON.stringify({ level: 'error', msg: 'requireAuth: session status lookup failed', err: String(err) }));
+      res.status(503).json({ error: 'Session service unavailable' });
+    },
+  );
 }
 
 /**
@@ -273,6 +333,28 @@ export function createExchangeRouter(pool: Pool): Router {
       return;
     }
 
+    // Bindung an die Kernel-Sitzung (efa-Task #137): jedes Kernel-Token trägt
+    // eine jti — Login/Refresh (`issueToken`) wie der Gateway-Tausch
+    // (`issueGatewayExchangeToken`). Ohne sie wäre die App-Sitzung nicht
+    // entwertbar. Die Format-Grenzen entsprechen denen des Status-Endpoints;
+    // ein Token außerhalb davon würde später bei jedem Request 503 liefern.
+    if (
+      typeof convergePayload.jti !== 'string' || !KERNEL_JTI_RE.test(convergePayload.jti) ||
+      typeof convergePayload.sub !== 'string' || !KERNEL_SUB_RE.test(convergePayload.sub) ||
+      !Number.isInteger(convergePayload.iat) || !Number.isInteger(convergePayload.exp)
+    ) {
+      res.status(401).json({ error: 'Invalid or expired platform token' });
+      return;
+    }
+    // Die App-Sitzung lebt genau so lange wie das Kernel-Token — nicht mehr
+    // pauschal 8 h ab Exchange (vorher „Lifetime-Drift": ein spät getauschtes
+    // Token ergab eine App-Sitzung, die den Kernel um bis zu 8 h überlebte).
+    const remainingSec = convergePayload.exp - Math.floor(Date.now() / 1000);
+    if (remainingSec <= 0) {
+      res.status(401).json({ error: 'Invalid or expired platform token' });
+      return;
+    }
+
     try {
       const { rows } = await pool.query<{ id: string }>(
         `INSERT INTO app_users (converge_id, email, name, last_seen_at)
@@ -298,10 +380,12 @@ export function createExchangeRouter(pool: Pool): Router {
         email: convergePayload.email ?? null,
         language: convergePayload.language,
         tenant: convergePayload.tenant,
+        kernelJti: convergePayload.jti,
+        kernelIat: convergePayload.iat,
       };
 
-      const sessionToken = jwt.sign(sessionPayload, getSessionSecret(), { algorithm: 'HS256', expiresIn: '8h' });
-      setSessionCookie(res, sessionToken);
+      const sessionToken = jwt.sign(sessionPayload, getSessionSecret(), { algorithm: 'HS256', expiresIn: remainingSec });
+      setSessionCookie(res, sessionToken, remainingSec * 1000);
 
       res.json({
         user: {

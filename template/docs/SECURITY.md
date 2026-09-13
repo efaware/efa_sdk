@@ -16,7 +16,8 @@ Never commit `.env` to version control.
 - `httpOnly: true` – not accessible via JavaScript (XSS protection)
 - `sameSite: 'lax'` – allows cross-site top-level navigations, blocks CSRF from third-party sites
 - `secure: true` in production – HTTPS only
-- 8-hour expiry (matching efa-one session lifetime)
+- expiry = expiry of the exchanged efa-one token (since `@efa-one/sdk` 1.17.0; before: a flat 8 h from exchange)
+- bound to the efa-one session: the cookie carries `kernelJti`/`kernelIat`, and `requireAuth` checks the session live against the kernel (`GET /api/internal/sessions/:jti/status`, cached 30 s). Kernel logout, password change, lock and kernel restart end the app session within 30 s; a failed lookup answers 503 (fail-closed). Requires a kernel that has this endpoint.
 
 ## Dev Routes
 
