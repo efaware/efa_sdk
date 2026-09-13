@@ -37,10 +37,16 @@ export interface SessionPayload {
    * `requireAuth` fragt damit bei jedem Request den Live-Status der
    * Kernel-Sitzung ab. Eine Sitzung ohne dieses Feld stammt von einem älteren
    * SDK und wird mit 401 abgewiesen.
+   *
+   * Optional getypt, obwohl jede vom Exchange ausgestellte Sitzung beide Felder
+   * trägt: Apps bauen `SessionPayload` auch selbst — für Service-Aufrufe (z. B.
+   * efa-ai `middleware/serviceAuth.ts`) und in Test-Factories. Pflichtfelder
+   * hätten dort jeden Bump auf 1.17 zum Compile-Fehler gemacht. Durchgesetzt
+   * wird zur Laufzeit in `requireAuth`.
    */
-  kernelJti: string;
+  kernelJti?: string;
   /** `iat` des eingetauschten Kernel-Tokens in Sekunden (seit 1.17.0). */
-  kernelIat: number;
+  kernelIat?: number;
 }
 
 /** Format-Grenzen wie im Kernel-Endpoint `GET /api/internal/sessions/:jti/status`. */
@@ -123,10 +129,8 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
     res.status(401).json({ error: 'Session invalid or expired' });
     return;
   }
-  if (
-    typeof payload.kernelJti !== 'string' || !payload.kernelJti ||
-    typeof payload.kernelIat !== 'number' || typeof payload.exp !== 'number'
-  ) {
+  const { kernelJti, kernelIat, exp } = payload;
+  if (typeof kernelJti !== 'string' || !kernelJti || typeof kernelIat !== 'number' || typeof exp !== 'number') {
     // Alt-Sitzung (vor SDK 1.17): an keine Kernel-Sitzung gebunden, also nicht
     // entwertbar. Kein Fallback — die App tauscht beim nächsten CONVERGE_AUTH neu.
     res.status(401).json({ error: 'Session invalid or expired' });
@@ -135,9 +139,9 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
   const verified = payload;
   getSessionStatus({
     convergeId: verified.convergeId,
-    jti: verified.kernelJti,
-    iat: verified.kernelIat,
-    exp: verified.exp as number,
+    jti: kernelJti,
+    iat: kernelIat,
+    exp,
   }).then(
     (status) => {
       if (!status.active) {
