@@ -105,6 +105,24 @@ describe('getSessionStatus', () => {
     expect(serviceCallMock).toHaveBeenCalledTimes(2);
   });
 
+  it('fails a hanging lookup after 5 s and does not cache it', async () => {
+    // Ohne Obergrenze hielte ein hängender Kernel jeden App-Request fest (#137).
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(T0);
+    serviceCallMock.mockReturnValueOnce(new Promise(() => { /* hängt */ }));
+
+    const pending = getSessionStatus(ref());
+    const assertion = expect(pending).rejects.toThrow(/timed out after 5000 ms/);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(serviceCallMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await assertion;
+
+    expect(sessionStatusCacheSize()).toBe(0);
+    expect(await getSessionStatus(ref())).toEqual({ active: true });
+    expect(serviceCallMock).toHaveBeenCalledTimes(2);
+  });
+
   it.each([
     ['204 / undefined', undefined],
     ['missing active', { reason: 'session_revoked' }],
