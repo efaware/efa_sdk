@@ -144,6 +144,14 @@ run under it. Dependabot is configured to never propose a TypeScript major.
 
 SemVer. Consuming apps pull new versions with `npm update @efa-one/sdk`.
 
+**Kernel compatibility — 1.17.0 needs an up-to-date kernel.** Since 1.17.0 the
+`app_session` cookie is bound to the kernel session and `requireAuth` checks it
+live via the kernel endpoint `GET /api/internal/sessions/:jti/status`. Against a
+kernel without that endpoint, every authenticated request fails closed with
+`503 Session service unavailable`. Roll out the kernel first, then apps on 1.17.
+Sessions issued by an older SDK are rejected once (401) and renewed on the next
+iframe load.
+
 ## License
 
 [Apache-2.0](./LICENSE) — permissive with a patent grant, so customers and partners

@@ -49,7 +49,7 @@ The exchange flow is identical in both cases – no special code paths in busine
 Receiving a JWT via postMessage and storing it in React state exposes it to XSS attacks. By immediately exchanging it for an httpOnly cookie:
 - The session credential is never readable by JavaScript
 - The cookie is scoped to the app's domain (not efa-one's domain)
-- The app manages its own session lifecycle independently of efa-one
+- The app session is bound to the efa-one session (since `@efa-one/sdk` 1.17.0): it expires with the efa-one token and `requireAuth` checks the kernel session live on every request (30 s cache), so an efa-one logout also ends the app session
 
 `JWT_PUBLIC_KEY` (efa-one's RSA public key) is only used for validation at the exchange endpoint.
 `APP_SESSION_SECRET` (the app's own key) signs session cookies – these are separate secrets.

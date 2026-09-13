@@ -35,7 +35,7 @@ With `ENVIRONMENT=development`, visiting the frontend will:
 3. Exchange it for an `app_session` cookie
 4. Show the DEV MODE header
 
-> Permissions come from `converge_access` live per request — they are not in the dev JWT. In a standalone single-app dev session without the efa-one stack, `converge_access` is unreachable, so permission-guarded routes will respond 503. To test those, run the full efa-one stack locally and assign roles to `dev-user-001` (or whichever `sub` the dev token uses), or temporarily switch the route to `requireAuth` while developing.
+> Permissions come from `converge_access` live per request — they are not in the dev JWT. In a standalone single-app dev session without the efa-one stack, `converge_access` is unreachable, so permission-guarded routes will respond 503. Since `@efa-one/sdk` 1.17.0 this applies to **every** `requireAuth`-protected route: the session is checked live against the kernel endpoint `GET /api/internal/sessions/:jti/status`, which is unreachable without the stack. To test those, run the full efa-one stack locally and assign roles to `dev-user-001` (or whichever `sub` the dev token uses), or temporarily switch the route to `requireAuth` while developing.
 
 ### Running in Docker locally
 

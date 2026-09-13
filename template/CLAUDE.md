@@ -211,6 +211,48 @@ In local dev (not in iframe + ENVIRONMENT=development):
 GET /dev/token → mock JWT → same exchange flow
 ```
 
+### `app_session` ist an die Kernel-Sitzung gebunden (ab `@efa-one/sdk` 1.17.0)
+
+Vorher lebte `app_session` pauschal 8 h ab Exchange und wusste nichts vom Kernel:
+nach Kernel-Logout, Passwortwechsel, Sperre oder Kernel-Neustart blieb der
+App-Zugriff bis zu 8 h bestehen („Lifetime-Drift", efa-Task #137). Jetzt:
+
+- **Exchange:** das Kernel-Token muss eine `jti` tragen (sonst 401). Das Cookie
+  bekommt `kernelJti` + `kernelIat` (neue Pflichtfelder in `SessionPayload`) und
+  läuft **genau so lange wie das Kernel-Token** (`exp` und Cookie-`Max-Age`).
+- **`requireAuth`** fragt nach dem HS256-Verify bei jedem Request den Live-Status
+  beim Kernel ab (`GET /api/internal/sessions/:jti/status` über `converge_access`,
+  `sessionStatusClient.ts`). Cache pro Sitzung: aktiv 30 s, entwertet bis zum
+  Sitzungsende. Eine Entwertung wirkt in der App also spätestens nach 30 s.
+  Alle Guards (`requireAdmin`, `requirePermission`, `requireAdminOrPermission`,
+  `requireInternalOrAuth`, `requireInternalOrAdminOrPermission`,
+  `GET /api/auth/permissions`) laufen darüber; der Provenance-Pfad
+  (`X-Service-Token`) bleibt ohne Sitzungsprüfung.
+
+| Situation | Antwort |
+|---|---|
+| Sitzung aktiv | `next()` |
+| Kernel meldet entwertet (`session_revoked`/`server_restarted`) | `401 { error: 'Session revoked' }` |
+| Alt-Sitzung von SDK < 1.17 (ohne `kernelJti`) | `401 { error: 'Session invalid or expired' }` |
+| Kernel nicht erreichbar / Endpoint fehlt | `503 { error: 'Session service unavailable' }` (fail-closed) |
+
+> **Pflicht: ein Kernel mit dem Endpoint `GET /api/internal/sessions/:jti/status`.**
+> Gegen einen älteren Kernel beantwortet `requireAuth` **jeden** authentifizierten
+> Request mit 503 — die App ist dann unbenutzbar. Also immer erst den Kernel
+> ausrollen, dann Apps mit SDK 1.17.
+
+**Im Frontend** wird ein 401 nicht automatisch neu getauscht: `apiFetch` wirft den
+Fehlertext, und `useConvergeAuth` tauscht pro Seitenlade-Vorgang nur einmal
+(Duplikate von `CONVERGE_AUTH` werden ignoriert). Eine neue Sitzung entsteht beim
+nächsten Laden des iframes — der Kernel schickt dann `CONVERGE_AUTH` erneut. Nach
+einem App-Update mit SDK 1.17 sehen offene Kacheln deshalb einmalig 401, bis sie
+neu geladen werden.
+
+**Lokale Entwicklung ohne Kernel:** `/dev/token` erzeugt ein Token mit `jti`, der
+Exchange klappt also. Jeder `requireAuth`-geschützte Request braucht aber den
+Kernel-Endpoint und antwortet ohne laufenden Stack mit 503 — für geschützte Routen
+den vollständigen Stack lokal starten (`CONVERGE_GATEWAY_URL` + `SERVICE_AUTH_KEY`).
+
 ## Fachliche Intake-Fragen (Pflicht — verbindlich für Claude)
 
 Diese App hat eine `docs/intake.md`. Sie enthält pro Kernel-/System-Service einen
