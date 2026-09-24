@@ -62,6 +62,24 @@ registerAppInfo({ appName: 'efa-chat', version: __APP_VERSION__ });
 ```
 
 ```tsx
+// Frontend — receive the login token from the kernel (inside a mount effect)
+import { subscribeConvergeAuth } from '@efa-one/sdk/frontend';
+
+useEffect(() => subscribeConvergeAuth({
+  onAuth: async ({ token, serviceKey, theme, language }) => {
+    try { await exchange(token, serviceKey); return true; } catch { return false; }
+  },
+  onTimeout: () => setError('No login received from the platform — reload the page.'),
+}), []);
+```
+
+The app asks for the token itself (`CONVERGE_AUTH_REQUEST`) as soon as its listener
+is attached and repeats the request with backoff. Waiting passively for the kernel's
+push is not enough: the push goes out in a fixed window after the tile opens, and an
+app that needs longer to mount (cold cache, slow connection) would miss it and spin
+forever.
+
+```tsx
 // Frontend — a fully-featured list in a few lines
 import { DataTable, type ColumnDef } from '@efa-one/sdk/frontend/ui';
 import { createViewPreferencesClient } from '@efa-one/sdk/frontend/viewPreferences';
@@ -151,6 +169,11 @@ kernel without that endpoint, every authenticated request fails closed with
 `503 Session service unavailable`. Roll out the kernel first, then apps on 1.17.
 Sessions issued by an older SDK are rejected once (401) and renewed on the next
 iframe load.
+
+**1.18.0 — auth handshake on request.** `subscribeConvergeAuth` sends
+`CONVERGE_AUTH_REQUEST` to the kernel. It works against any kernel: an older kernel
+ignores the request and its fixed-window push reaches the app as before; a current
+kernel answers the request directly. No rollout order.
 
 ## License
 
