@@ -158,3 +158,155 @@ export function notifyRouteChange(path: string): void {
   if (!isEmbedded()) return;
   window.parent.postMessage({ type: 'CONVERGE_ROUTE_CHANGED', path }, getParentOrigin());
 }
+
+// ─── Auth-Handshake (CONVERGE_AUTH_REQUEST → CONVERGE_AUTH) ─────────────────
+
+/** Kernel → App: Login-Token + Kontext für den Exchange. */
+export const CONVERGE_AUTH = 'CONVERGE_AUTH';
+
+/**
+ * App → Kernel: „Ich höre zu, bitte schick das Token." Trägt bewusst keine
+ * Felder — der Kernel beantwortet die Anfrage ausschließlich anhand des Frames,
+ * aus dem sie kam (`event.source`), und nimmt `serviceKey` aus seinem eigenen
+ * Zustand, nie aus der Nachricht.
+ */
+export const CONVERGE_AUTH_REQUEST = 'CONVERGE_AUTH_REQUEST';
+
+/** Nutzlast von `CONVERGE_AUTH`. `theme` bleibt generisch, jede App typisiert es selbst. */
+export interface ConvergeAuthMessage<TTheme = unknown> {
+  type: typeof CONVERGE_AUTH;
+  token: string;
+  serviceKey?: string;
+  language?: string;
+  theme?: TTheme;
+  /** Kernel-Side-Panel-Hinweis (Chat). */
+  embed?: boolean;
+}
+
+export interface SubscribeConvergeAuthOptions<TTheme = unknown> {
+  /**
+   * Führt den Token-Exchange aus. `true` = gelungen (weitere `CONVERGE_AUTH`
+   * werden ab dann ignoriert), `false` = gescheitert (die nächste Nachricht
+   * bekommt eine neue Chance).
+   */
+  onAuth: (message: ConvergeAuthMessage<TTheme>) => Promise<boolean>;
+  /** Kam innerhalb von `timeoutMs` gar kein `CONVERGE_AUTH` an. Feuert höchstens einmal. */
+  onTimeout?: () => void;
+  /** Zeitpunkte (ms ab Aufruf), zu denen die Anfrage gesendet wird. */
+  requestDelaysMs?: readonly number[];
+  /** Frist bis `onTimeout`. */
+  timeoutMs?: number;
+}
+
+export const DEFAULT_AUTH_REQUEST_DELAYS_MS: readonly number[] = [0, 500, 1_000, 2_000, 4_000, 8_000];
+export const DEFAULT_AUTH_TIMEOUT_MS = 15_000;
+
+function isAuthMessage(data: unknown): data is ConvergeAuthMessage {
+  const d = data as { type?: unknown; token?: unknown } | null;
+  return !!d && d.type === CONVERGE_AUTH && typeof d.token === 'string' && d.token !== '';
+}
+
+/**
+ * Empfängt das Login-Token vom Kernel und stößt den Exchange an.
+ *
+ * Warum eine Anfrage statt nur zu warten: Der Kernel pusht `CONVERGE_AUTH` in ein
+ * festes Zeitfenster (0/250/800 ms + iframe-`onLoad`). Das `onLoad` kommt fast
+ * immer VOR dem React-Mount (createRoot rendert asynchron), und braucht die App
+ * länger als ~800 ms bis zum Mount — kalter Cache, langsame Leitung —, gingen alle
+ * Nachrichten verloren: Dauer-Spinner, bis der Nutzer neu lädt. Deshalb meldet die
+ * App sich hier selbst, SOBALD ihr Listener steht, und wiederholt die Anfrage mit
+ * Backoff, bis ein Token kommt. Ein Kernel ohne Unterstützung ignoriert die Anfrage;
+ * der Push wirkt dann wie bisher.
+ *
+ * Riegel (aus efa #236 übernommen):
+ *   authenticated — ein Exchange ist gelungen; alles Weitere wird ignoriert.
+ *   inFlight      — ein Exchange läuft; eintreffende Nachrichten nur merken.
+ *   queued        — die zuletzt gemerkte Nachricht; wird nachgeholt, wenn der
+ *                   laufende Exchange scheitert.
+ *
+ * Nicht eingebettet → No-op; den Dev-Modus behandelt die App selbst.
+ *
+ * @returns Unsubscribe (Listener + Timer weg) — aus dem Mount-Effect zurückgeben.
+ */
+export function subscribeConvergeAuth<TTheme = unknown>(
+  options: SubscribeConvergeAuthOptions<TTheme>,
+): () => void {
+  if (!isEmbedded()) return () => {};
+  const delays = options.requestDelaysMs ?? DEFAULT_AUTH_REQUEST_DELAYS_MS;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_AUTH_TIMEOUT_MS;
+
+  let active = true;
+  let received = false;
+  let authenticated = false;
+  let inFlight = false;
+  let queued: ConvergeAuthMessage<TTheme> | null = null;
+  const timers: ReturnType<typeof setTimeout>[] = [];
+
+  const clearTimers = (): void => {
+    timers.forEach((t) => clearTimeout(t));
+    timers.length = 0;
+  };
+
+  const start = (message: ConvergeAuthMessage<TTheme>): void => {
+    inFlight = true;
+    options.onAuth(message).then(
+      (ok) => finish(ok),
+      () => finish(false),
+    );
+  };
+
+  const finish = (ok: boolean): void => {
+    inFlight = false;
+    if (!active) return;
+    if (ok) {
+      authenticated = true;
+      queued = null;
+      clearTimers();
+      return;
+    }
+    const next = queued;
+    queued = null;
+    if (next) start(next);
+  };
+
+  const handler = (event: MessageEvent): void => {
+    // Herkunft zuerst: das Token nur vom einbettenden Kernel-Frame annehmen.
+    if (!isFromPlatformParent(event)) return;
+    if (!isAuthMessage(event.data)) return;
+    received = true;
+    if (authenticated) return;
+    const message = event.data as ConvergeAuthMessage<TTheme>;
+    if (inFlight) {
+      queued = message;
+      return;
+    }
+    start(message);
+  };
+
+  const request = (): void => {
+    // Die Anfrage soll nur das Token zustellen. Ist eins angekommen, ist ihr Job
+    // erledigt — auch wenn der Exchange scheitert: sonst provozierte jeder
+    // weitere Termin einen neuen Exchange (bei 401/503 bis zu sechs). Einen
+    // gescheiterten Versuch holen Push und `queued` nach, wie bisher (efa #236).
+    if (!active || received) return;
+    window.parent.postMessage({ type: CONVERGE_AUTH_REQUEST }, getParentOrigin());
+  };
+
+  // Listener VOR der ersten Anfrage, sonst könnte die Antwort ihn überholen.
+  window.addEventListener('message', handler);
+  for (const ms of delays) {
+    if (ms <= 0) request();
+    else timers.push(setTimeout(request, ms));
+  }
+  timers.push(
+    setTimeout(() => {
+      if (active && !received) options.onTimeout?.();
+    }, timeoutMs),
+  );
+
+  return () => {
+    active = false;
+    clearTimers();
+    window.removeEventListener('message', handler);
+  };
+}
