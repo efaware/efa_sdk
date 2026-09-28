@@ -152,7 +152,7 @@ export function RecordDialog({
           <div className="flex justify-end mb-2 -mt-1">
             <button
               onClick={() => setMode('edit')}
-              className="p-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface-raised)] transition-colors"
+              className="p-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-primary-text)] hover:bg-[var(--color-surface-raised)] transition-colors"
               title={editLabel}
               aria-label={editLabel}
             >

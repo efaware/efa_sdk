@@ -175,6 +175,17 @@ iframe load.
 ignores the request and its fixed-window push reaches the app as before; a current
 kernel answers the request directly. No rollout order.
 
+**1.19.0 — readable signal colors (WCAG AA).** `styles.css` now defines
+`--color-danger-text`, `--color-warning-text`, `--color-success-text` and
+`--color-primary-text`: the semantic color mixed toward `--color-text-primary`, so
+they darken in light themes and lighten in dark ones and follow every kernel theme,
+including custom ones. `Badge`, `Alert` and the danger item of `DropdownMenu` use
+them for text; fills and borders keep the pure signal color. `Alert` takes its colors
+from `.alert-<variant>` in `styles.css` now, so it needs that import like `Badge`
+already did. No kernel change and no rollout order. Apps should switch their own
+signal-colored text (`text-[var(--color-danger)]`, orange links) to the `-text`
+tokens.
+
 ## License
 
 [Apache-2.0](./LICENSE) — permissive with a patent grant, so customers and partners

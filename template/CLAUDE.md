@@ -413,8 +413,9 @@ per SDK-Version-Bump in alle Apps.
 import { Button, Badge, Dialog, DropdownMenu, Tooltip, EmptyState, Skeleton, RecordDialog, Alert, DataTable } from '@efa-one/sdk/frontend/ui';
 ```
 
-**Einmal pro App** die Begleit-Styles importieren (liefert die `.badge`/`.skeleton`-
-Klassen + Shimmer-Keyframes) — im Template steht das bereits in `main.tsx`:
+**Einmal pro App** die Begleit-Styles importieren (liefert die `.badge`/`.alert`/`.skeleton`-
+Klassen, Shimmer-Keyframes und die AA-Text-Tokens `--color-<ton>-text`, siehe Regeln
+unten) — im Template steht das bereits in `main.tsx`:
 
 ```tsx
 import '@efa-one/sdk/frontend/ui/styles.css';
@@ -443,6 +444,15 @@ Sizes: `w-4 h-4` inline, `w-5 h-5` standalone. Never use other icon libraries.
 **Rules:**
 - No fully-styled component libraries (MUI, Ant Design, Chakra, shadcn)
 - All colors via `var(--color-*)` — never hardcoded hex values
+- **Signalfarbe als Schrift nur über die `-text`-Tokens.** `--color-danger|warning|success|primary`
+  sind Flächen-/Rahmen-/Icon-Farben; als Text auf hellem Grund fallen sie durch WCAG AA
+  (4,5 : 1 — im Kernel-Theme „Standard Light" Bernstein 2,15, Grün 2,28, Orange 2,95, Rot 3,76).
+  Für Text, Links und Status-Zellen deshalb `text-[var(--color-danger-text)]`,
+  `…-warning-text`, `…-success-text`, `…-primary-text`. Die Tokens liefert
+  `@efa-one/sdk/frontend/ui/styles.css` (ab SDK 1.19.0), abgeleitet per `color-mix()` Richtung
+  `--color-text-primary` — sie passen sich also jedem Kernel-Theme an, hell wie dunkel, und
+  werden **nicht** in der App-`index.css` nachdefiniert. `Badge`, `Alert` und
+  `DropdownMenu` (`variant="danger"`) nutzen sie bereits.
 - Destructive actions always behind a `Dialog` confirmation
 - **Fehler-/Validierungsbanner immer über `Alert` (nie handgerollt).** Zwei
   Pflichtregeln (Details: `app-development-specs/DESIGN_SYSTEM.md` → „Zustände →

@@ -7,7 +7,32 @@
  *
  * Die Design-Tokens (`--color-*`, `--border-radius-*`) definiert die App selbst
  * (Kernel-Theme-überschrieben zur Laufzeit) — hier bewusst NICHT dupliziert.
+ * Einzige Ausnahme: die abgeleiteten Text-Tokens direkt darunter.
  */
+
+/* ── Signalfarben als TEXT (WCAG AA) ─────────────────────────────
+ * Die reinen Signalfarben (`--color-danger|warning|success|primary`) sind
+ * Flächen-/Rahmenfarben. Als Schrift auf hellem Grund fallen sie durch den
+ * AA-Kontrast (4,5 : 1): im Kernel-Theme „Standard Light" Rot 3,76, Orange 2,95,
+ * Grün 2,28, Bernstein 2,15. Für TEXT deshalb immer die `-text`-Variante.
+ *
+ * Abgeleitet per color-mix() RICHTUNG `--color-text-primary`: im hellen Theme
+ * wird die Farbe dunkler, im dunklen heller — ein Token für beide Modi. Weil
+ * `--color-text-primary` und die Signalfarben zur Laufzeit per CONVERGE_AUTH
+ * auf :root überschrieben werden, rechnet der Browser die Mischung für JEDES
+ * Theme neu, auch für Custom Themes aus dem Kernel.
+ *
+ * Mischanteile gegen alle Built-in-Themes des Kernels nachgerechnet (hell/dunkel,
+ * auf surface, background, surface-raised und der 10/15-%-Tönung von Alert/Badge):
+ * Minimum 4,86 : 1. Test: test/signalTextContrast.test.ts — wer einen Anteil
+ * anhebt, muss den Test grün halten.
+ */
+:root {
+  --color-danger-text:  color-mix(in srgb, var(--color-danger) 55%, var(--color-text-primary));
+  --color-warning-text: color-mix(in srgb, var(--color-warning) 45%, var(--color-text-primary));
+  --color-success-text: color-mix(in srgb, var(--color-success) 45%, var(--color-text-primary));
+  --color-primary-text: color-mix(in srgb, var(--color-primary) 50%, var(--color-text-primary));
+}
 
 /* ── Badge utilities ─────────────────────────────────────────── */
 .badge {
@@ -20,19 +45,44 @@
 }
 .badge-success {
   background: color-mix(in srgb, var(--color-success) 15%, transparent);
-  color: var(--color-success);
+  color: var(--color-success-text);
 }
 .badge-warning {
   background: color-mix(in srgb, var(--color-warning) 15%, transparent);
-  color: var(--color-warning);
+  color: var(--color-warning-text);
 }
 .badge-danger {
   background: color-mix(in srgb, var(--color-danger) 15%, transparent);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 .badge-neutral {
   background: var(--color-surface-raised);
   color: var(--color-text-secondary);
+}
+
+/* ── Alert (Fehler-/Status-Banner) ───────────────────────────────
+ * Fläche = 10-%-Tönung, Rahmen = reine Signalfarbe, Text = `-text`-Variante.
+ * Bewusst hier und nicht als Tailwind-Arbitrary im Component: die App-Tailwind
+ * scannt `node_modules` nicht zwingend, dann fehlten die Farben ganz. */
+.alert-error {
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  border-color: var(--color-danger);
+  color: var(--color-danger-text);
+}
+.alert-success {
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  border-color: var(--color-success);
+  color: var(--color-success-text);
+}
+.alert-warning {
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+  border-color: var(--color-warning);
+  color: var(--color-warning-text);
+}
+.alert-info {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border-color: var(--color-primary);
+  color: var(--color-primary-text);
 }
 
 /* ── Skeleton loading ────────────────────────────────────────── */

@@ -1,6 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  // Das SDK-ui-Kit bringt Tailwind-Klassen mit (Arbitrary-Werte wie
+  // `text-[var(--color-danger-text)]`) — ohne diesen Pfad fehlen sie im CSS.
+  content: ['./index.html', './src/**/*.{ts,tsx}', './node_modules/@efa-one/sdk/frontend/**/*.js'],
   darkMode: 'class',
   theme: {
     extend: {
