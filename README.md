@@ -32,6 +32,9 @@ kit in `content` — otherwise classes used only inside SDK components (`fixed`,
 content: ['./index.html', './src/**/*.{ts,tsx}', './node_modules/@efa-one/sdk/frontend/**/*.js'],
 ```
 
+On Tailwind v4 (`@import "tailwindcss"`), add the path to the CSS entry file
+instead: `@source "../node_modules/@efa-one/sdk/frontend/**/*.js";`
+
 > **Note on legacy prefixes:** Some platform-internal identifiers (postMessage
 > message types, environment variable names, JWT `iss`) still carry technical
 > legacy prefixes from an earlier naming. These are part of the wire protocol
