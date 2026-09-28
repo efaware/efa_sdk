@@ -53,6 +53,10 @@ export function makeSessionPayload(overrides: Partial<SessionPayload> = {}): Ses
     name: 'testuser',
     email: 'testuser@example.com',
     tenant: 'default',
+    // Seit SDK 1.17 (efa #137) bindet der Exchange die Sitzung an das Kernel-Token;
+    // `requireAuth` weist Sitzungen ohne diese beiden Felder mit 401 ab.
+    kernelJti: nextId('kernel-jti'),
+    kernelIat: 1_700_000_000,
     ...overrides,
   };
 }
@@ -100,6 +104,10 @@ export function makeRsaKeypair(): {
 /**
  * Signiert ein Plattform-JWT (RS256, iss/aud = `converge`), wie es der Kernel
  * ausstellt und `POST /api/auth/exchange` erwartet.
+ *
+ * Seit SDK 1.17 (efa #137) weist der Exchange Tokens ohne `jti` mit 401 ab — jedes
+ * Kernel-Token trägt eine, damit die App-Sitzung entwertbar ist. `iat`/`exp` setzt
+ * `jwt.sign` selbst. `{ jti: undefined }` als Claim erzeugt ein Token ohne `jti`.
  */
 export function makePlatformToken(
   privateKeyPem: string,
@@ -107,7 +115,14 @@ export function makePlatformToken(
   options: jwt.SignOptions = {},
 ): string {
   return jwt.sign(
-    { sub: 'converge-user-1', name: 'testuser', email: 'testuser@example.com', tenant: 'default', ...claims },
+    {
+      sub: 'converge-user-1',
+      name: 'testuser',
+      email: 'testuser@example.com',
+      tenant: 'default',
+      jti: nextId('kernel-jti'),
+      ...claims,
+    },
     privateKeyPem,
     { algorithm: 'RS256', expiresIn: '1h', issuer: 'converge', audience: 'converge', ...options },
   );
