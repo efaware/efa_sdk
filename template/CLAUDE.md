@@ -448,7 +448,8 @@ Sizes: `w-4 h-4` inline, `w-5 h-5` standalone. Never use other icon libraries.
   sind Flächen-/Rahmen-/Icon-Farben; als Text auf hellem Grund fallen sie durch WCAG AA
   (4,5 : 1 — im Kernel-Theme „Standard Light" Bernstein 2,15, Grün 2,28, Orange 2,95, Rot 3,76).
   Für Text, Links und Status-Zellen deshalb `text-[var(--color-danger-text)]`,
-  `…-warning-text`, `…-success-text`, `…-primary-text`. Die Tokens liefert
+  `…-warning-text`, `…-success-text`, `…-primary-text` — oder die fertigen Klassen
+  `signal-text-danger|warning|success|primary`. Die Tokens + Klassen liefert
   `@efa-one/sdk/frontend/ui/styles.css` (ab SDK 1.19.0), abgeleitet per `color-mix()` Richtung
   `--color-text-primary` — sie passen sich also jedem Kernel-Theme an, hell wie dunkel, und
   werden **nicht** in der App-`index.css` nachdefiniert. `Badge`, `Alert` und

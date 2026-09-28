@@ -105,9 +105,9 @@ describe('Signalfarben als Text – WCAG AA (styles.css)', () => {
     expect(contrast(hex(p.warning), hex(p.surface))).toBeCloseTo(2.15, 2);
   });
 
-  it('Badge- und Alert-Klassen setzen Text nur über die -text-Tokens', () => {
-    const blocks = [...css.matchAll(/\.(badge|alert)-(success|warning|danger|error|info)\s*\{([^}]*)\}/g)];
-    expect(blocks.length).toBe(7);
+  it('Badge-, Alert- und signal-text-Klassen setzen Text nur über die -text-Tokens', () => {
+    const blocks = [...css.matchAll(/\.(badge|alert|signal-text)-(success|warning|danger|error|info|primary)\s*\{([^}]*)\}/g)];
+    expect(blocks.length).toBe(11);
     for (const [, kind, variant, body] of blocks) {
       const color = body.match(/(?:^|[\s;])color:\s*([^;]+);/)?.[1];
       expect(color, `.${kind}-${variant}`).toMatch(/^var\(--color-(danger|warning|success|primary)-text\)$/);

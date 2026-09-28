@@ -34,6 +34,15 @@
   --color-primary-text: color-mix(in srgb, var(--color-primary) 50%, var(--color-text-primary));
 }
 
+/* Text-Hilfsklassen für die `-text`-Tokens. Das ui-Kit nutzt diese Klassen statt
+ * `text-[var(--color-…-text)]`: Arbitrary-Werte erzeugt die Tailwind der App nur,
+ * wenn ihr `content` das SDK scannt — ohne das verlöre z. B. der „Löschen"-Eintrag
+ * im DropdownMenu still seine Farbe. Apps dürfen sie ebenfalls nutzen. */
+.signal-text-danger  { color: var(--color-danger-text); }
+.signal-text-warning { color: var(--color-warning-text); }
+.signal-text-success { color: var(--color-success-text); }
+.signal-text-primary { color: var(--color-primary-text); }
+
 /* ── Badge utilities ─────────────────────────────────────────── */
 .badge {
   display: inline-flex;
