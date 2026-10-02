@@ -464,7 +464,7 @@ export function DataTable<T, K extends string | number>({
                     <span>{col.label}</span>
                     {activeSort === 'asc' && <ChevronUp className="w-3 h-3" />}
                     {activeSort === 'desc' && <ChevronDown className="w-3 h-3" />}
-                    {isFiltered && <Filter className="w-3 h-3 text-[var(--color-primary)]" />}
+                    {isFiltered && <Filter className="w-3 h-3 signal-text-primary" />}
                   </button>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Content className="min-w-[220px] p-1">
