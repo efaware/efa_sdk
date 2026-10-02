@@ -1,6 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  // Das SDK-UI-Kit (`@efa-one/sdk/frontend/ui`) bringt Komponenten mit eigenen
+  // Tailwind-Klassen mit. Tailwind scannt `node_modules` nicht von selbst — ohne den
+  // dritten Eintrag fehlen Klassen, die nur im SDK vorkommen (`fixed`, `z-50`, …), und
+  // Dialoge rendern unsichtbar im Seitenfluss. Glob auf `.js`: das Paket liefert kompiliert aus.
+  content: ['./index.html', './src/**/*.{ts,tsx}', './node_modules/@efa-one/sdk/frontend/**/*.js'],
   darkMode: 'class',
   theme: {
     extend: {

@@ -44,7 +44,7 @@ export const Item = React.forwardRef<React.ElementRef<typeof Radix.Item>, ItemPr
       ref={ref}
       className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-sm cursor-pointer outline-none select-none transition-colors data-[disabled]:opacity-50 data-[disabled]:pointer-events-none ${
         variant === 'danger'
-          ? 'text-[var(--color-danger)] data-[highlighted]:bg-[var(--color-surface-raised)]'
+          ? 'signal-text-danger data-[highlighted]:bg-[var(--color-surface-raised)]'
           : 'text-[var(--color-text-primary)] data-[highlighted]:bg-[var(--color-surface-raised)]'
       } ${className}`}
       {...props}

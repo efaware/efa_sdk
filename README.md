@@ -23,7 +23,17 @@ Every individual module is also reachable directly, e.g.
 
 The `frontend/ui` kit renders against the platform design tokens (`--color-*`,
 `--border-radius-*`) and expects Tailwind in the consuming app; `lucide-react` and
-the `@radix-ui/*` primitives it uses are optional peer dependencies.
+the `@radix-ui/*` primitives it uses are optional peer dependencies. Tailwind does
+not scan `node_modules`, so the consuming app's `tailwind.config.js` must list the
+kit in `content` — otherwise classes used only inside SDK components (`fixed`,
+`z-50`, …) are purged and dialogs render invisibly:
+
+```js
+content: ['./index.html', './src/**/*.{ts,tsx}', './node_modules/@efa-one/sdk/frontend/**/*.js'],
+```
+
+On Tailwind v4 (`@import "tailwindcss"`), add the path to the CSS entry file
+instead: `@source "../node_modules/@efa-one/sdk/frontend/**/*.js";`
 
 > **Note on legacy prefixes:** Some platform-internal identifiers (postMessage
 > message types, environment variable names, JWT `iss`) still carry technical
@@ -174,6 +184,19 @@ iframe load.
 `CONVERGE_AUTH_REQUEST` to the kernel. It works against any kernel: an older kernel
 ignores the request and its fixed-window push reaches the app as before; a current
 kernel answers the request directly. No rollout order.
+
+**1.19.0 — readable signal colors (WCAG AA).** `styles.css` now defines
+`--color-danger-text`, `--color-warning-text`, `--color-success-text` and
+`--color-primary-text`: the semantic color mixed toward `--color-text-primary`, so
+they darken in light themes and lighten in dark ones and follow every kernel theme,
+including custom ones, plus the classes `.signal-text-danger|warning|success|primary`.
+`Badge`, `Alert`, the danger item of `DropdownMenu` and the DataTable filter icon use
+them for text; fills and borders keep the pure signal color. These colors come from
+classes in `styles.css`, not Tailwind arbitrary values, so they work even when the
+app's Tailwind does not scan the SDK — but `Alert` now needs the `styles.css` import
+like `Badge` already did. No kernel change and no rollout order. Apps should switch their own
+signal-colored text (`text-[var(--color-danger)]`, orange links) to the `-text`
+tokens.
 
 ## License
 
