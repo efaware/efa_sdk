@@ -110,11 +110,13 @@ jobs:
 
       - uses: sigstore/cosign-installer@v3
 
+      # Identitäts-Allowlist = Kernel-Default COSIGN_IDENTITY_REGEXP (imageSignature.ts)
+      # und kanonische ci/templates/shared/image-scan.yml — beim Erweitern alle drei ziehen.
       - name: Cosign verify (blockierend)
         run: |
           cosign verify "${{ env.IMAGE }}" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            --certificate-identity-regexp '^https://github.com/(efaware|convergeplattform)/[^/]+/\.github/workflows/docker-image.*\.yml@'
+            --certificate-identity-regexp '^https://github.com/(efaware|convergeplattform|D-W-IT-Consulting)/[^/]+/\.github/workflows/docker-image.*\.yml@'
 
       # HARTER GATE: CRITICAL blockiert den Check — inkl. unfixed. `ignore-unfixed:
       # false` ist hier bewusst gesetzt (Gegenteil zum fs-Scan): eine EOL-Runtime
