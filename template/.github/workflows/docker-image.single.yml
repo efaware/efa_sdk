@@ -41,6 +41,7 @@ jobs:
       - name: Compute IMAGE_BASE (normalize repo name)
         run: |
           OWNER="${{ github.repository_owner }}"
+          OWNER="${OWNER,,}"   # OCI-/GHCR-Refs müssen lowercase sein (D-W-IT-Consulting → d-w-it-consulting); docker push + cosign sign scheitern sonst
           REPO="${{ github.event.repository.name }}"
           REPO_NORM="${REPO//-/_}"
           echo "IMAGE_BASE=${OWNER}/${REPO_NORM}" >> "$GITHUB_ENV"
@@ -72,6 +73,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile.single
+          platforms: linux/amd64
           build-args: |
             APP_VERSION=${{ github.ref_name }}
           push: true
