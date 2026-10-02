@@ -23,7 +23,17 @@ Every individual module is also reachable directly, e.g.
 
 The `frontend/ui` kit renders against the platform design tokens (`--color-*`,
 `--border-radius-*`) and expects Tailwind in the consuming app; `lucide-react` and
-the `@radix-ui/*` primitives it uses are optional peer dependencies.
+the `@radix-ui/*` primitives it uses are optional peer dependencies. Tailwind does
+not scan `node_modules`, so the consuming app's `tailwind.config.js` must list the
+kit in `content` — otherwise classes used only inside SDK components (`fixed`,
+`z-50`, …) are purged and dialogs render invisibly:
+
+```js
+content: ['./index.html', './src/**/*.{ts,tsx}', './node_modules/@efa-one/sdk/frontend/**/*.js'],
+```
+
+On Tailwind v4 (`@import "tailwindcss"`), add the path to the CSS entry file
+instead: `@source "../node_modules/@efa-one/sdk/frontend/**/*.js";`
 
 > **Note on legacy prefixes:** Some platform-internal identifiers (postMessage
 > message types, environment variable names, JWT `iss`) still carry technical

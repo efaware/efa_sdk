@@ -86,6 +86,18 @@ describe('POST /api/auth/exchange – Abweisung ungültiger Anfragen', () => {
     // Assert
     expect(res.status).toBe(401);
   });
+
+  it('antwortet mit 401 bei einem Token ohne jti (Sitzung wäre nicht entwertbar)', async () => {
+    // Arrange – seit SDK 1.17 (efa #137) Pflicht-Claim jedes Kernel-Tokens.
+    const token = makePlatformToken(keys.privateKeyPem, { jti: undefined });
+
+    // Act
+    const res = await request(app).post('/api/auth/exchange').send({ token });
+
+    // Assert
+    expect(res.status).toBe(401);
+    expect(res.body.error).toMatch(/Invalid or expired platform token/);
+  });
 });
 
 describe('POST /api/auth/exchange – Auto-Provisioning gegen echtes SQLite', () => {

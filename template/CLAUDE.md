@@ -1,6 +1,6 @@
 # efa-one App Template
 
-efa-app-template-version: 1.13.0
+efa-app-template-version: 1.13.1
 
 ## What this is
 
@@ -422,7 +422,14 @@ import '@efa-one/sdk/frontend/ui/styles.css';
 
 Voraussetzung im Consumer (liefert das Scaffold mit): die Design-Tokens
 (`--color-*`, `--border-radius-*`, aus `converge-tokens.css`, kernel-runtime-
-überschrieben) + das Tailwind-Radius-Mapping (`tailwind.config.js`).
+überschrieben), das Tailwind-Radius-Mapping (`tailwind.config.js`) **und der
+SDK-Pfad in `content`** (`'./node_modules/@efa-one/sdk/frontend/**/*.js'`).
+Fehlt der, entfernt Tailwind alle Klassen, die nur in SDK-Komponenten vorkommen
+(`fixed`, `z-50` …) — `Dialog`/`RecordDialog` erscheinen dann nicht.
+Apps auf **Tailwind v4** (`@import "tailwindcss"`, z. B. efa-chat) tragen den
+Pfad stattdessen per `@source "../node_modules/@efa-one/sdk/frontend/**/*.js";`
+in die CSS-Einstiegsdatei ein. Die automatische Quellen-Erkennung von v4
+überspringt `node_modules`.
 
 | Component | When to use |
 |---|---|
