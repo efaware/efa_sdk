@@ -16,21 +16,13 @@ interface AlertProps {
   className?: string;
 }
 
-// Jede Variante nutzt EINE CSS-Farbvariable für Rahmen + Text und eine
-// 10%-Tönung derselben Farbe als Fläche (via color-mix). Dadurch ist der Text
-// IMMER lesbar — nie „Text in derselben Farbe wie die Fläche". Niemals
-// `bg-opacity-*`/`border-opacity-*` auf eine `bg-[var(--…)]`-Arbitrary anwenden:
-// diese Utilities wirken dort nicht, die Fläche bleibt vollflächig → Rot-auf-Rot.
-const VARIANT: Record<AlertVariant, string> = {
-  error:
-    'bg-[color-mix(in_srgb,var(--color-danger)_10%,transparent)] border-[var(--color-danger)] text-[var(--color-danger)]',
-  success:
-    'bg-[color-mix(in_srgb,var(--color-success)_10%,transparent)] border-[var(--color-success)] text-[var(--color-success)]',
-  warning:
-    'bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)] border-[var(--color-warning)] text-[var(--color-warning)]',
-  info:
-    'bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] border-[var(--color-primary)] text-[var(--color-primary)]',
-};
+// Farben kommen aus `styles.css` (`.alert-<variant>`): 10-%-Tönung der
+// Signalfarbe als Fläche, reine Signalfarbe als Rahmen und die AA-taugliche
+// `--color-<ton>-text`-Variante als Schrift. So ist der Text IMMER lesbar — nie
+// „Text in derselben Farbe wie die Fläche" und nie die reine Signalfarbe auf
+// hellem Grund (< 4,5 : 1). Niemals `bg-opacity-*`/`border-opacity-*` auf eine
+// `bg-[var(--…)]`-Arbitrary anwenden: diese Utilities wirken dort nicht, die
+// Fläche bleibt vollflächig → Rot-auf-Rot.
 
 /**
  * Fehler-/Status-Banner für Formulare und Dialoge.
@@ -45,7 +37,7 @@ export function Alert({ variant = 'error', children, onDismiss, className = '' }
   return (
     <div
       role="alert"
-      className={`shrink-0 flex items-start gap-2 border rounded-md px-4 py-3 text-sm font-medium ${VARIANT[variant]} ${className}`}
+      className={`shrink-0 flex items-start gap-2 border rounded-md px-4 py-3 text-sm font-medium alert-${variant} ${className}`}
     >
       <span className="flex-1">{children}</span>
       {onDismiss && (
