@@ -104,6 +104,11 @@ const columns: ColumnDef<Item>[] = [
 <DataTable listId="items.list" rows={items} columns={columns} rowKey={(r) => r.id} persistence={viewPrefs} />
 ```
 
+Columns added later show up in views users saved before (at their natural position) — no
+need to bump `DEFAULT_VIEW_VERSION` and reset everyone's view. Grouped lists open collapsed;
+pass `groupsDefaultExpanded` (e.g. with `initialPrefs={{ groupBy: ['category'] }}`) to start
+with every group expanded while keeping groups the user collapses closed.
+
 ## Build your first app
 
 This repo ships a ready-to-copy app scaffold under [`template/`](./template) — the fastest

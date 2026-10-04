@@ -29,7 +29,7 @@
  * `--border-radius-*`) im DOM und (für innen genutzte Klassen keine, aber ihre
  * Geschwister `Badge`/`Skeleton`) `@efa-one/sdk/frontend/ui/styles.css`.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as DropdownMenu from './DropdownMenu.js';
 import { ChevronDown, ChevronUp, ChevronRight, Settings, EyeOff, Filter, RotateCcw, ArrowUp, ArrowDown, Layers, X } from 'lucide-react';
 import { Button } from './Button.js';
@@ -103,6 +103,12 @@ interface DataTableProps<T, K extends string | number> {
   /** Footer-Status, z.B. „128 Einträge". */
   footer?: React.ReactNode;
   /**
+   * Wenn true, starten neu auftauchende Gruppen ausgeklappt statt zugeklappt
+   * (z. B. Vorlagen nach Kategorie gruppiert). Manuelles Zuklappen bleibt
+   * erhalten — nur erstmals gesehene Gruppen-Keys werden aufgeklappt.
+   */
+  groupsDefaultExpanded?: boolean;
+  /**
    * Persistenz der Ansicht (Spalten/Sort/Filter/Gruppierung) pro Benutzer und
    * `listId`. Ohne Adapter bleibt die Ansicht In-Memory (kein Backend). Für den
    * Standard-Endpoint: `createViewPreferencesClient()` aus
@@ -125,6 +131,26 @@ export function defaultPrefsFor<T>(columns: ColumnDef<T>[], overrides?: Partial<
     version: DEFAULT_VIEW_VERSION,
     ...(overrides ?? {}),
   };
+}
+
+/**
+ * Gleicht eine gespeicherte `columnOrder` mit der aktuellen Spaltendefinition ab:
+ * unbekannte (entfernte) IDs fallen raus, neu hinzugekommene Spalten werden an ihrer
+ * natürlichen Position aus `columns` eingefügt. So erscheint eine später ergänzte
+ * Spalte auch in einer alten gespeicherten Ansicht — und am richtigen Platz —, ohne
+ * dass dafür DEFAULT_VIEW_VERSION hochgezählt (und damit jede Ansicht verworfen)
+ * werden muss.
+ */
+export function reconcileOrder<T>(columns: ColumnDef<T>[], order: string[]): string[] {
+  const known = new Set(columns.map((c) => c.id));
+  const result = order.filter((id) => known.has(id));
+  const present = new Set(result);
+  columns.forEach((c, idx) => {
+    if (present.has(c.id)) return;
+    result.splice(Math.min(idx, result.length), 0, c.id);
+    present.add(c.id);
+  });
+  return result;
 }
 
 // ─── Gruppierung ──────────────────────────────────────────────────────────────
@@ -204,10 +230,38 @@ export function buildRenderItems<T>(
   return out;
 }
 
+/** Sammelt ALLE Gruppen-Keys (alle Ebenen), unabhängig vom Aufklapp-Zustand. */
+export function collectAllGroupKeys<T>(
+  rows: T[],
+  groupBy: string[],
+  columnsById: Map<string, ColumnDef<T>>,
+): string[] {
+  const keys: string[] = [];
+  const recurse = (subset: T[], depth: number, parentKey: string): void => {
+    if (depth >= groupBy.length) return;
+    const col = columnsById.get(groupBy[depth]);
+    if (!col) return;
+    const buckets = new Map<string, T[]>();
+    for (const r of subset) {
+      const lbl = groupLabelOf(col.accessor(r)) || EMPTY_GROUP_LABEL;
+      const arr = buckets.get(lbl) ?? [];
+      arr.push(r);
+      buckets.set(lbl, arr);
+    }
+    for (const [label, childRows] of buckets) {
+      const key = parentKey ? `${parentKey}${GROUP_KEY_SEP}${label}` : label;
+      keys.push(key);
+      recurse(childRows, depth + 1, key);
+    }
+  };
+  recurse(rows, 0, '');
+  return keys;
+}
+
 // ─── Komponente ───────────────────────────────────────────────────────────────
 
 export function DataTable<T, K extends string | number>({
-  listId, rows, columns, rowKey, onRowClick, selection, initialPrefs, footer, persistence,
+  listId, rows, columns, rowKey, onRowClick, selection, initialPrefs, footer, groupsDefaultExpanded, persistence,
 }: DataTableProps<T, K>): React.ReactElement {
   const defaultPrefs = useMemo(() => defaultPrefsFor(columns, initialPrefs), [columns, initialPrefs]);
   const [prefs, setPrefs, reset] = useViewPreferences<ViewPrefs>(listId, defaultPrefs, persistence);
@@ -215,7 +269,8 @@ export function DataTable<T, K extends string | number>({
   const isMobile = useIsMobile();
 
   // Expanded-Gruppen sind bewusst NICHT in den ViewPrefs — User-Experience-
-  // Entscheidung: jeder Besuch der Liste startet mit allen Gruppen zugeklappt.
+  // Entscheidung: jeder Besuch der Liste startet mit allen Gruppen zugeklappt
+  // (außer `groupsDefaultExpanded`, siehe unten).
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const toggleGroup = (key: string): void => {
     setExpandedGroups((prev) => {
@@ -233,12 +288,30 @@ export function DataTable<T, K extends string | number>({
   // Robustheit: groupBy kann beim Schema-Upgrade fehlen — für alten Cache.
   const groupBy = prefs.groupBy ?? [];
 
+  // Nachträglich ergänzte Spalten in eine evtl. gespeicherte Ansicht einsortieren.
+  const effectiveOrder = useMemo(() => reconcileOrder(columns, prefs.columnOrder), [columns, prefs.columnOrder]);
+
+  // Default-aufgeklappte Gruppen: neu auftauchende Keys einmalig aufklappen,
+  // ohne manuell zugeklappte Gruppen wieder zu öffnen.
+  const seenGroupKeysRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!groupsDefaultExpanded || groupBy.length === 0) return;
+    const fresh = collectAllGroupKeys(rows, groupBy, columnsById).filter((k) => !seenGroupKeysRef.current.has(k));
+    if (fresh.length === 0) return;
+    fresh.forEach((k) => seenGroupKeysRef.current.add(k));
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      fresh.forEach((k) => next.add(k));
+      return next;
+    });
+  }, [groupsDefaultExpanded, rows, groupBy, columnsById]);
+
   const visibleColumns = useMemo(() => {
     const byId = new Map(columns.map((c) => [c.id, c] as const));
-    return prefs.columnOrder
+    return effectiveOrder
       .map((id) => byId.get(id))
       .filter((c): c is ColumnDef<T> => Boolean(c) && prefs.columnVisibility[c!.id] !== false);
-  }, [columns, prefs.columnOrder, prefs.columnVisibility]);
+  }, [columns, effectiveOrder, prefs.columnVisibility]);
 
   // Sortierung + Filterung clientseitig.
   const sortedFilteredRows = useMemo(() => {
@@ -324,7 +397,7 @@ export function DataTable<T, K extends string | number>({
     });
   };
   const moveColumn = (columnId: string, dir: -1 | 1): void => {
-    const order = [...prefs.columnOrder];
+    const order = [...effectiveOrder];
     const idx = order.indexOf(columnId);
     if (idx < 0) return;
     const newIdx = idx + dir;
@@ -764,7 +837,7 @@ function ColumnInventoryButton<T>({
   const [open, setOpen] = useState(false);
   const orderedColumns = useMemo(() => {
     const byId = new Map(columns.map((c) => [c.id, c] as const));
-    return prefs.columnOrder.map((id) => byId.get(id)).filter(Boolean) as ColumnDef<T>[];
+    return reconcileOrder(columns, prefs.columnOrder).map((id) => byId.get(id)).filter(Boolean) as ColumnDef<T>[];
   }, [columns, prefs.columnOrder]);
 
   return (

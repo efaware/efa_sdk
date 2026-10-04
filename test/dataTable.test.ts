@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildRenderItems,
+  collectAllGroupKeys,
   defaultPrefsFor,
+  reconcileOrder,
   groupLabelOf,
   DEFAULT_VIEW_VERSION,
   type ColumnDef,
@@ -74,5 +76,36 @@ describe('buildRenderItems', () => {
     const items = buildRenderItems(withEmpty, ['cat'], byId, new Set());
     const labels = items.filter((i) => i.kind === 'group').map((i) => i.label);
     expect(labels[labels.length - 1]).toBe('– ohne –');
+  });
+});
+
+describe('reconcileOrder', () => {
+  it('fügt nachträglich ergänzte Spalten an ihrer natürlichen Position in eine alte Ansicht ein', () => {
+    // gespeichert, bevor es `cat` gab — und vom Nutzer umsortiert
+    expect(reconcileOrder(columns, ['secret', 'name'])).toEqual(['secret', 'cat', 'name']);
+  });
+
+  it('lässt entfernte Spalten fallen und behält die Nutzer-Reihenfolge', () => {
+    expect(reconcileOrder(columns, ['cat', 'gone', 'name', 'secret'])).toEqual(['cat', 'name', 'secret']);
+  });
+
+  it('ist für eine vollständige Reihenfolge die Identität', () => {
+    expect(reconcileOrder(columns, ['name', 'cat', 'secret'])).toEqual(['name', 'cat', 'secret']);
+  });
+});
+
+describe('collectAllGroupKeys', () => {
+  const byId = new Map(columns.map((c) => [c.id, c] as const));
+
+  it('liefert alle Gruppen-Keys aller Ebenen unabhängig vom Aufklapp-Zustand', () => {
+    const keys = collectAllGroupKeys(rows, ['cat', 'name'], byId);
+    expect(keys).toHaveLength(4);
+    expect(keys).toEqual(expect.arrayContaining(['A', 'B']));
+    // Unterebene ist an den Eltern-Key gebunden
+    expect(keys.some((k) => k.startsWith('A') && k.endsWith('Alice') && k !== 'A')).toBe(true);
+  });
+
+  it('ohne groupBy keine Keys', () => {
+    expect(collectAllGroupKeys(rows, [], byId)).toEqual([]);
   });
 });
