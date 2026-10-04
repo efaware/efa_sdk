@@ -153,6 +153,15 @@ export function reconcileOrder<T>(columns: ColumnDef<T>[], order: string[]): str
   return result;
 }
 
+/**
+ * Sichtbarkeit einer Spalte: gespeicherte Wahl des Nutzers, sonst der Code-Default.
+ * Der Rückfall zählt für Spalten, die nach dem Speichern der Ansicht ergänzt wurden
+ * (siehe reconcileOrder) — eine neue Spalte mit `defaultVisible: false` bleibt so aus.
+ */
+export function isColumnVisible<T>(column: ColumnDef<T>, visibility: Record<string, boolean>): boolean {
+  return visibility[column.id] ?? column.defaultVisible !== false;
+}
+
 // ─── Gruppierung ──────────────────────────────────────────────────────────────
 
 /** Normalisiert einen Accessor-Output zum Gruppierungs-Label (Strings, Arrays joined). */
@@ -310,7 +319,7 @@ export function DataTable<T, K extends string | number>({
     const byId = new Map(columns.map((c) => [c.id, c] as const));
     return effectiveOrder
       .map((id) => byId.get(id))
-      .filter((c): c is ColumnDef<T> => Boolean(c) && prefs.columnVisibility[c!.id] !== false);
+      .filter((c): c is ColumnDef<T> => Boolean(c) && isColumnVisible(c!, prefs.columnVisibility));
   }, [columns, effectiveOrder, prefs.columnVisibility]);
 
   // Sortierung + Filterung clientseitig.
@@ -935,7 +944,7 @@ function ColumnInventoryButton<T>({
 
         <div className="text-xs font-semibold mb-2 text-[var(--color-text-muted)] uppercase">Spalten</div>
         {orderedColumns.map((col, idx) => {
-          const visible = prefs.columnVisibility[col.id] !== false;
+          const visible = isColumnVisible(col, prefs.columnVisibility);
           return (
             <div
               key={col.id}

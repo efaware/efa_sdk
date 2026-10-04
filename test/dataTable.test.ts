@@ -3,6 +3,7 @@ import {
   buildRenderItems,
   collectAllGroupKeys,
   defaultPrefsFor,
+  isColumnVisible,
   reconcileOrder,
   groupLabelOf,
   DEFAULT_VIEW_VERSION,
@@ -107,5 +108,15 @@ describe('collectAllGroupKeys', () => {
 
   it('ohne groupBy keine Keys', () => {
     expect(collectAllGroupKeys(rows, [], byId)).toEqual([]);
+  });
+});
+
+describe('isColumnVisible', () => {
+  it('nimmt die gespeicherte Wahl, sonst den Code-Default (auch für später ergänzte Spalten)', () => {
+    const secret = columns[2]; // defaultVisible: false
+    expect(isColumnVisible(secret, {})).toBe(false);
+    expect(isColumnVisible(secret, { secret: true })).toBe(true);
+    expect(isColumnVisible(columns[0], {})).toBe(true);
+    expect(isColumnVisible(columns[0], { name: false })).toBe(false);
   });
 });
