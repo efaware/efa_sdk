@@ -89,14 +89,14 @@ die Fälle. Details und die Ratchet-Regel für die Coverage-Schwellen stehen in 
 
 ## Berechtigungsobjekte
 
-Beim Anlegen der Kachel werden automatisch erzeugt:
+Beim Anlegen der Kachel erzeugt der Kernel automatisch **nur** `.default`:
 
 | Key | Beschreibung |
 |---|---|
 | `{service_key}.default` | Kachel-Sichtbarkeit, App nutzbar (auto-generiert) |
-| `{service_key}.admin` | Admin-Zugriff (auto-generiert) |
 
-Eigene Permissions werden über `registerPermissions()` beim App-Start gemeldet:
+Ein `{service_key}.admin` wird **nicht** automatisch angelegt. Alle weiteren Permissions
+(auch `.admin`) meldet die App selbst über `registerPermissions()` beim App-Start:
 
 ```ts
 import { registerPermissions } from '@efa-one/sdk/backend/permissions';
