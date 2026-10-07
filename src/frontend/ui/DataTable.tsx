@@ -272,7 +272,8 @@ export function buildRenderItems<T>(
       const raw = col.accessor(r);
       const isDate = isDateColumn(col, raw);
       if (isDate) chronological = true;
-      const lbl = isDate ? (timeOf(raw) == null ? '' : formatCellValue(col, r)) : groupLabelOf(raw);
+      // Auch 'datetime' gruppiert nach Tag (formatDate), sonst entstünde je Minute eine Gruppe.
+      const lbl = isDate ? (timeOf(raw) == null ? '' : formatDate(raw as DateInput)) : groupLabelOf(raw);
       const bucketLabel = lbl || EMPTY_GROUP_LABEL;
       const arr = buckets.get(bucketLabel) ?? [];
       arr.push(r);

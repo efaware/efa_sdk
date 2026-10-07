@@ -175,4 +175,14 @@ describe('Datumsspalten', () => {
       ['– ohne –', 1],
     ]);
   });
+
+  it('gruppiert datetime-Spalten nach Tag, nicht nach Minute', () => {
+    const col: ColumnDef<Doc> = { ...dateCol, type: 'datetime' };
+    const docs: Doc[] = [
+      { id: 'a', at: '2026-10-07T09:00:00Z' },
+      { id: 'b', at: '2026-10-07T13:30:00Z' },
+    ];
+    const items = buildRenderItems(docs, ['at'], new Map([['at', col]]), new Set());
+    expect(items.map((i) => [i.label, i.count])).toEqual([['07.10.2026', 2]]);
+  });
 });
