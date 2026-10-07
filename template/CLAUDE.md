@@ -762,10 +762,13 @@ nachdem mehrere Apps inkonsistente Listen produziert haben.
    - Spalte ausblenden
 4. **Zahnrad oben rechts:** `Settings`-Icon öffnet ein Popover mit dem
    **Spalten-Inventar** — alle Spalten inkl. ausgeblendeter, als
-   Checkboxes umschaltbar; Reihenfolge zunächst per Up/Down-Icons
-   (Drag-Reorder optional, Phase 2).
+   Checkboxes umschaltbar; Reihenfolge per Up/Down-Icons. Zusätzlich (ab
+   SDK 1.20.0) in der Kopfzeile: Spalte am Griff (rechts in der Zelle, bei
+   Hover) per Drag & Drop verschieben, Breite an der rechten Kante ziehen
+   (Doppelklick bzw. „Standardbreite" im Spaltenmenü = zurück zum Code-Default,
+   Pfeiltasten auf der fokussierten Kante).
 5. **Benutzer-persistierte Ansicht:** Spalten-Sichtbarkeit, -Reihenfolge,
-   aktive Sortierung und aktive Filter werden **pro Liste pro User**
+   -Breiten, aktive Sortierung und aktive Filter werden **pro Liste pro User**
    persistiert. Persistenz **App-lokal in der App-DB** über die Tabelle
    `{app}_view_preferences` und den injizierten `persistence`-Adapter der
    `DataTable` (`createViewPreferencesClient` aus
@@ -787,6 +790,15 @@ nachdem mehrere Apps inkonsistente Listen produziert haben.
    Der Hook ist zusätzlich als `useIsMobile` aus `@efa-one/sdk/frontend/ui`
    exportiert; App-lokale Kopien davon sind abzulösen, damit die Schwelle
    plattformweit an einer Stelle steht.
+
+**Datumsspalten (ab SDK 1.20.0):** `type: 'date'` (→ `07.10.2026`) bzw.
+`type: 'datetime'` (→ `07.10.2026, 16:30`) an der `ColumnDef` setzen und im
+`accessor` den Rohwert (ISO-String, Epoch-ms, `Date`) liefern — **keinen** `cell`-
+Renderer mit `toLocaleDateString` (der liefert `7.10.2026`). Die Tabelle formatiert
+dann selbst, sortiert chronologisch, gruppiert nach Tag, und der Textfilter trifft
+die angezeigte Schreibweise. Wer trotzdem einen eigenen `cell` braucht (z. B. für
+Styling), formatiert darin über `formatDate`/`formatDateTime` aus
+`@efa-one/sdk/frontend/format` und setzt `type` trotzdem — für Sortierung und Filter.
 
 **Pflichtfeld pro Liste:** stabile `list_id` (z. B. `'invoices.list'`,
 `'users.list'`) als Schlüssel für `view_preferences`. Niemals zufällige
