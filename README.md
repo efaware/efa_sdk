@@ -14,7 +14,7 @@ sub-paths — this keeps `express` out of the frontend and `react` out of the ba
 |---|---|---|
 | `@efa-one/sdk/backend` | Node/Express | Auth + token exchange (`requireAuth`, `createExchangeRouter`, `requireInternalOrAuth` …), health router, service discovery + gateway client (`serviceClient`, `resolveService`), clients for audit/reporting/mail/notifications, permission resolution/registration (`getUserPermissions`, `registerPermissions`, `checkPermission`), capability registry (`registerApiMetadata`), backend i18n |
 | `@efa-one/sdk/frontend` | Browser/React | postMessage IPC (`registerAppInfo`, `sendAtStart`, `navigateToApp`, `notifyRouteChange` …), react-i18next factory (`initI18n`), `DevHeader` |
-| `@efa-one/sdk/frontend/ui` | Browser/React | The efa-one design-system kit: `Button`, `Input`, `Badge`, `Alert`, `Dialog`, `DropdownMenu`, `Tooltip`, `EmptyState`, `Skeleton`, `RecordDialog`, and the **`DataTable`** (sortable/filterable/groupable list with per-user persisted view; reflows to stacked cards below 640px). Also exports `useIsMobile` — the platform-wide 640px breakpoint hook. Ship its companion CSS once: `import '@efa-one/sdk/frontend/ui/styles.css'` |
+| `@efa-one/sdk/frontend/ui` | Browser/React | The efa-one design-system kit: `Button`, `Input`, `Badge`, `Alert`, `Dialog`, `DropdownMenu`, `Tooltip`, `EmptyState`, `Skeleton`, `RecordDialog`, and the **`DataTable`** (sortable/filterable/groupable list with draggable, resizable columns and a per-user persisted view; reflows to stacked cards below 640px). Also exports `useIsMobile` — the platform-wide 640px breakpoint hook. Ship its companion CSS once: `import '@efa-one/sdk/frontend/ui/styles.css'` |
 | `@efa-one/sdk/frontend/format` | Browser | Platform-wide date/time display — `formatDate` (`01.09.2026`), `formatDateTime` (`01.09.2026, 11:05`), `formatTime`, `formatFileStamp`, `localeForLanguage`. Always use these instead of `toLocaleDateString`/`toLocaleString`: without an options object those render `1.9.2026`, and without a locale argument they follow the browser language (`9/1/2026`) |
 | `@efa-one/sdk/frontend/viewPreferences` | Browser/React | Persistence seam for `DataTable` — `createViewPreferencesClient()` (standard `/api/view-preferences/:listId` adapter) + `useViewPreferences()` |
 
@@ -99,6 +99,7 @@ const viewPrefs = createViewPreferencesClient({ apiBase: getApiBase }); // creat
 const columns: ColumnDef<Item>[] = [
   { id: 'name', label: 'Name', accessor: (r) => r.name, filter: { type: 'text' } },
   { id: 'status', label: 'Status', accessor: (r) => r.status },
+  { id: 'created', label: 'Angelegt', accessor: (r) => r.createdAt, type: 'date' }, // → 07.10.2026
 ];
 
 <DataTable listId="items.list" rows={items} columns={columns} rowKey={(r) => r.id} persistence={viewPrefs} />
@@ -197,6 +198,18 @@ app's Tailwind does not scan the SDK — but `Alert` now needs the `styles.css` 
 like `Badge` already did. No kernel change and no rollout order. Apps should switch their own
 signal-colored text (`text-[var(--color-danger)]`, orange links) to the `-text`
 tokens.
+
+**1.20.0 — columns you can move and resize, date columns.** In the DataTable header,
+each column has a grip (right side, on hover) to drag it to a new position and a
+handle on its right edge to drag its width; double-click the handle (or „Standardbreite"
+in the column menu) to go back to the code default, arrow keys resize from the keyboard.
+Order and widths persist per user with the rest of the view (`columnWidths` in the
+stored JSON, no version bump, existing saved views stay). New `ColumnDef.type`:
+`'date'` renders `DD.MM.YYYY`, `'datetime'` `DD.MM.YYYY, HH:MM` (via `format.ts`), sorts
+chronologically, groups by day and lets the text filter match the displayed form.
+`Date` values without a `type` are formatted as dates too. Custom `cell` renderers stay
+the app's job: use `formatDate`/`formatDateTime`, never `toLocaleDateString` (that is
+where `7.10.2026` comes from). No backend or kernel change.
 
 ## License
 

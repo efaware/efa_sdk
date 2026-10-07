@@ -6,11 +6,21 @@
  *   1. Auswahl-Spalte links (Checkbox + Master) — opt-in via `selection`-Prop
  *   2. Bulk-Aktionen via `selection.bulkActions`
  *   3. Spalten-Header-Popover: Sortieren auf/ab, Filtern, Spalte ausblenden
- *   4. Zahnrad oben rechts: Spalten-Inventar mit Sichtbarkeit + Reihenfolge
- *   5. Persistente Ansicht via `useViewPreferences` (Pflicht: stabile `listId`) —
+ *   4. Zahnrad oben rechts: Spalten-Inventar mit Sichtbarkeit + Reihenfolge;
+ *      zusätzlich lassen sich Spalten in der Kopfzeile am Griff verschieben und
+ *      an der rechten Kante in der Breite ziehen (Doppelklick = Standardbreite)
+ *   5. Persistente Ansicht via `useViewPreferences` (Pflicht: stabile `listId`),
+ *      inkl. Reihenfolge und Spaltenbreiten —
  *      Persistenz wird über die `persistence`-Prop (ViewPreferencesAdapter)
  *      injiziert; ohne Adapter läuft die Ansicht rein In-Memory.
  *   6. Default-Ansicht + „Zurücksetzen"-Button im Zahnrad-Popover
+ *
+ * **Datumsspalten** deklarieren `type: 'date'` bzw. `'datetime'`: die Tabelle
+ * zeigt dann `DD.MM.YYYY` (bzw. `DD.MM.YYYY, HH:MM`) über `formatDate`/
+ * `formatDateTime`, sortiert chronologisch, und der Textfilter trifft die
+ * angezeigte Schreibweise. `Date`-Werte ohne `type` formatiert sie ebenfalls als
+ * Datum. Eigene `cell`-Renderer müssen selbst über `@efa-one/sdk/frontend/format`
+ * gehen — nie `toLocaleDateString` (liefert `7.10.2026` statt `07.10.2026`).
  *
  * Sortierung und Filterung erfolgen clientseitig — für < 1000 Zeilen völlig
  * ausreichend. Bei größeren Datenmengen wäre serverseitige Sortierung/Filterung
@@ -29,12 +39,13 @@
  * `--border-radius-*`) im DOM und (für innen genutzte Klassen keine, aber ihre
  * Geschwister `Badge`/`Skeleton`) `@efa-one/sdk/frontend/ui/styles.css`.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import * as DropdownMenu from './DropdownMenu.js';
-import { ChevronDown, ChevronUp, ChevronRight, Settings, EyeOff, Filter, RotateCcw, ArrowUp, ArrowDown, Layers, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Settings, EyeOff, Filter, RotateCcw, ArrowUp, ArrowDown, Layers, X, GripVertical } from 'lucide-react';
 import { Button } from './Button.js';
 import { useViewPreferences, type ViewPreferencesAdapter } from '../viewPreferences.js';
 import { useIsMobile } from '../useIsMobile.js';
+import { formatDate, formatDateTime, type DateInput } from '../format.js';
 
 // Trennzeichen für komposite Gruppen-Keys (Unit Separator — kommt in
 // User-Text nicht vor).
@@ -52,10 +63,13 @@ export interface ColumnDef<T> {
   id: string;                            // stabile Spalten-ID (Persistenz-Key)
   label: string;
   accessor: (row: T) => unknown;         // Wert für Sortierung + Default-Filter
-  cell?: (row: T) => React.ReactNode;    // Render — Default: String(accessor(row))
+  cell?: (row: T) => React.ReactNode;    // Render — Default: formatCellValue(col, row)
+  /** 'date' → DD.MM.YYYY, 'datetime' → DD.MM.YYYY, HH:MM; sortiert chronologisch.
+   *  Der accessor liefert dafür ISO-String, Epoch-ms oder `Date`. */
+  type?: 'text' | 'date' | 'datetime';
   filter?: FilterDef;
   sortable?: boolean;
-  width?: string;                        // CSS grid-template-columns Anteil ('1fr', '120px', …)
+  width?: string;                        // CSS grid-template-columns Anteil ('1fr', '120px', …) — Default, bis der User zieht
   defaultVisible?: boolean;              // Default true
 }
 
@@ -80,6 +94,10 @@ interface ViewPrefs {
   /** Hierarchische Gruppierung: Reihenfolge der columnIds bestimmt die Ebenen.
    *  Leerer Array = keine Gruppierung. */
   groupBy: string[];
+  /** Vom Benutzer gezogene Spaltenbreiten in px. Fehlt eine Spalte, gilt ihr
+   *  `width` aus der ColumnDef. Optional, damit gespeicherte Ansichten von vor
+   *  dem Feature ohne Versions-Bump (= ohne Reset) weiterlaufen. */
+  columnWidths?: Record<string, number>;
   /** Schema-Version der Ansicht (siehe DEFAULT_VIEW_VERSION). */
   version?: number;
 }
@@ -122,9 +140,85 @@ export function defaultPrefsFor<T>(columns: ColumnDef<T>[], overrides?: Partial<
     sort: null,
     filters: {},
     groupBy: [],
+    columnWidths: {},
     version: DEFAULT_VIEW_VERSION,
     ...(overrides ?? {}),
   };
+}
+
+// ─── Zellwerte (Anzeige, Datum) ──────────────────────────────────────────────
+
+function isDateColumn<T>(col: ColumnDef<T>, value: unknown): boolean {
+  return col.type === 'date' || col.type === 'datetime' || (col.type == null && value instanceof Date);
+}
+
+/** Zeitstempel in ms oder `null` (leer/unparsbar) — für die chronologische Sortierung. */
+function timeOf(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const t = value instanceof Date ? value.getTime() : new Date(value as string | number).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+/**
+ * Text, den die Tabelle für eine Zelle ohne eigenen `cell`-Renderer zeigt — und
+ * gegen den der Textfilter sucht. Datumsspalten laufen über die Plattform-
+ * Formatierer (`DD.MM.YYYY`), leere/ungültige Datumswerte werden zu „—".
+ */
+export function formatCellValue<T>(col: ColumnDef<T>, row: T): string {
+  const v = col.accessor(row);
+  if (isDateColumn(col, v)) {
+    return col.type === 'datetime' ? formatDateTime(v as DateInput) : formatDate(v as DateInput);
+  }
+  return String(v ?? '');
+}
+
+// ─── Spalten-Reihenfolge + -Breite ───────────────────────────────────────────
+
+/** Untergrenze beim Ziehen: Label + Sortier-Pfeil bleiben gerade noch lesbar. */
+export const MIN_COLUMN_WIDTH = 60;
+/** Obergrenze, damit ein verrutschter Zug die Tabelle nicht unbenutzbar macht. */
+export const MAX_COLUMN_WIDTH = 1600;
+/** Schrittweite der Pfeiltasten an der Ziehkante. */
+const KEYBOARD_RESIZE_STEP = 16;
+
+export function clampColumnWidth(px: number): number {
+  if (!Number.isFinite(px)) return MIN_COLUMN_WIDTH;
+  return Math.round(Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, px)));
+}
+
+/**
+ * Verschiebt `sourceId` vor bzw. hinter `targetId`. Arbeitet auf der VOLLEN
+ * Reihenfolge (inkl. ausgeblendeter Spalten), damit diese ihre Position relativ
+ * zu den Nachbarn behalten. Unbekannte IDs oder source === target → unverändert.
+ */
+export function reorderColumns(
+  order: string[],
+  sourceId: string,
+  targetId: string,
+  side: 'before' | 'after',
+): string[] {
+  if (sourceId === targetId) return order;
+  if (!order.includes(sourceId) || !order.includes(targetId)) return order;
+  const without = order.filter((id) => id !== sourceId);
+  const targetIdx = without.indexOf(targetId);
+  without.splice(side === 'before' ? targetIdx : targetIdx + 1, 0, sourceId);
+  return without;
+}
+
+/** `grid-template-columns` für Kopfzeile + Zeilen: gezogene Breite vor Code-Default. */
+export function gridTemplateFor<T>(
+  visibleColumns: ColumnDef<T>[],
+  columnWidths: Record<string, number> | undefined,
+  hasSelection: boolean,
+): string {
+  const cols: string[] = [];
+  if (hasSelection) cols.push('36px');
+  visibleColumns.forEach((c) => {
+    const w = columnWidths?.[c.id];
+    cols.push(typeof w === 'number' && Number.isFinite(w) ? `${clampColumnWidth(w)}px` : (c.width ?? '1fr'));
+  });
+  cols.push('40px');  // Zahnrad-Spalte
+  return cols.join(' ');
 }
 
 // ─── Gruppierung ──────────────────────────────────────────────────────────────
@@ -170,18 +264,27 @@ export function buildRenderItems<T>(
       return;
     }
     // Bucket by label-of-accessor; stabile Reihenfolge: erstes Auftreten.
+    // Datumsspalten gruppieren nach dem angezeigten Tag, nicht nach dem ISO-Rohwert.
     const buckets = new Map<string, T[]>();
+    const bucketTime = new Map<string, number | null>();
+    let chronological = false;
     for (const r of subset) {
-      const lbl = groupLabelOf(col.accessor(r));
+      const raw = col.accessor(r);
+      const isDate = isDateColumn(col, raw);
+      if (isDate) chronological = true;
+      const lbl = isDate ? (timeOf(raw) == null ? '' : formatCellValue(col, r)) : groupLabelOf(raw);
       const bucketLabel = lbl || EMPTY_GROUP_LABEL;
       const arr = buckets.get(bucketLabel) ?? [];
       arr.push(r);
       buckets.set(bucketLabel, arr);
+      if (!bucketTime.has(bucketLabel)) bucketTime.set(bucketLabel, isDate ? timeOf(raw) : null);
     }
-    // Empty group ans Ende sortieren, sonst alphabetisch nach Locale.
+    // Empty group ans Ende sortieren, sonst alphabetisch nach Locale —
+    // Datumsgruppen chronologisch („07.10." vor „01.11.").
     const labels = Array.from(buckets.keys()).sort((a, b) => {
       if (a === EMPTY_GROUP_LABEL) return 1;
       if (b === EMPTY_GROUP_LABEL) return -1;
+      if (chronological) return (bucketTime.get(a) ?? 0) - (bucketTime.get(b) ?? 0);
       return a.localeCompare(b, 'de');
     });
     for (const label of labels) {
@@ -232,6 +335,14 @@ export function DataTable<T, K extends string | number>({
 
   // Robustheit: groupBy kann beim Schema-Upgrade fehlen — für alten Cache.
   const groupBy = prefs.groupBy ?? [];
+  const columnWidths = prefs.columnWidths ?? {};
+
+  // Spalte, die gerade am Griff gezogen wird, + aktuelle Einfüge-Position.
+  const [dragColumnId, setDragColumnId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; side: 'before' | 'after' } | null>(null);
+  // Während des Breiten-Ziehens wird das Grid-Template direkt an diesem
+  // Container (CSS-Variable) gesetzt — sonst rendert jede Mausbewegung alle Zeilen.
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const visibleColumns = useMemo(() => {
     const byId = new Map(columns.map((c) => [c.id, c] as const));
@@ -251,7 +362,10 @@ export function DataTable<T, K extends string | number>({
         const q = f.text.toLowerCase();
         out = out.filter((r) => {
           const v = col.accessor(r);
-          return v != null && String(v).toLowerCase().includes(q);
+          if (v == null) return false;
+          // Datumsspalten: gegen die angezeigte Schreibweise suchen („07.10").
+          const text = isDateColumn(col, v) ? formatCellValue(col, r) : String(v);
+          return text.toLowerCase().includes(q);
         });
       } else if (col.filter.type === 'multi-select' && f.selected && f.selected.length > 0) {
         const set = new Set(f.selected);
@@ -270,8 +384,12 @@ export function DataTable<T, K extends string | number>({
       if (col) {
         const dir = prefs.sort.direction === 'asc' ? 1 : -1;
         out = [...out].sort((a, b) => {
-          const va = col.accessor(a);
-          const vb = col.accessor(b);
+          let va = col.accessor(a);
+          let vb = col.accessor(b);
+          if (isDateColumn(col, va) || isDateColumn(col, vb)) {
+            va = timeOf(va);
+            vb = timeOf(vb);
+          }
           if (va == null && vb == null) return 0;
           if (va == null) return 1 * dir;
           if (vb == null) return -1 * dir;
@@ -302,13 +420,11 @@ export function DataTable<T, K extends string | number>({
   };
 
   // ── Grid-Template ────────────────────────────────────────────────────────
-  const gridTemplate = useMemo(() => {
-    const cols: string[] = [];
-    if (selection) cols.push('36px');
-    visibleColumns.forEach((c) => cols.push(c.width ?? '1fr'));
-    cols.push('40px');  // Zahnrad-Spalte
-    return cols.join(' ');
-  }, [selection, visibleColumns]);
+  const gridTemplate = useMemo(
+    () => gridTemplateFor(visibleColumns, columnWidths, !!selection),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selection, visibleColumns, prefs.columnWidths],
+  );
 
   // ── Handlers (Header-Popover) ────────────────────────────────────────────
   const setSort = (columnId: string, direction: 'asc' | 'desc'): void => {
@@ -331,6 +447,25 @@ export function DataTable<T, K extends string | number>({
     if (newIdx < 0 || newIdx >= order.length) return;
     [order[idx], order[newIdx]] = [order[newIdx], order[idx]];
     setPrefs({ ...prefs, columnOrder: order });
+  };
+  const dropColumn = (sourceId: string, targetId: string, side: 'before' | 'after'): void => {
+    const order = reorderColumns(prefs.columnOrder, sourceId, targetId, side);
+    if (order.join(GROUP_KEY_SEP) !== prefs.columnOrder.join(GROUP_KEY_SEP)) {
+      setPrefs({ ...prefs, columnOrder: order });
+    }
+  };
+  /** Live-Vorschau beim Ziehen, ohne React-Render und ohne Persistenz. */
+  const previewColumnWidth = (columnId: string, px: number): void => {
+    containerRef.current?.style.setProperty(
+      '--dt-cols',
+      gridTemplateFor(visibleColumns, { ...columnWidths, [columnId]: px }, !!selection),
+    );
+  };
+  const setColumnWidth = (columnId: string, px: number | null): void => {
+    const next = { ...columnWidths };
+    if (px == null) delete next[columnId];
+    else next[columnId] = clampColumnWidth(px);
+    setPrefs({ ...prefs, columnWidths: next });
   };
   const addGroupBy = (columnId: string): void => {
     if (groupBy.includes(columnId)) return;
@@ -392,7 +527,11 @@ export function DataTable<T, K extends string | number>({
   return (
     // overflow-x-auto: ein zu breites Grid scrollt IN SICH statt das ganze
     // Dokument seitwärts zu kippen (zusammen mit `min-w-min` an den Grid-Zeilen).
-    <div className="border border-[var(--color-border)] overflow-x-auto">
+    <div
+      ref={containerRef}
+      className="border border-[var(--color-border)] overflow-x-auto"
+      style={{ '--dt-cols': gridTemplate } as React.CSSProperties}
+    >
       {/* Bulk-Bar */}
       {selection && selection.selected.size > 0 && (
         <div
@@ -439,7 +578,7 @@ export function DataTable<T, K extends string | number>({
         /* Header (Desktop) */
         <div
           className="grid items-center min-w-min px-3 py-2 text-xs font-medium border-b border-[var(--color-border)]"
-          style={{ gridTemplateColumns: gridTemplate, background: 'var(--color-surface-raised)' }}
+          style={{ gridTemplateColumns: 'var(--dt-cols)', background: 'var(--color-surface-raised)' }}
         >
           {selection && (
             <input
@@ -454,14 +593,35 @@ export function DataTable<T, K extends string | number>({
             const filterValue = prefs.filters[col.id];
             const isFiltered = filterValue != null;
             return (
-              <DropdownMenu.Root key={col.id}>
+              <HeaderCell
+                key={col.id}
+                columnId={col.id}
+                label={col.label}
+                dragColumnId={dragColumnId}
+                dropSide={dropTarget?.id === col.id ? dropTarget.side : null}
+                onDragStart={() => setDragColumnId(col.id)}
+                onDragEnd={() => { setDragColumnId(null); setDropTarget(null); }}
+                onDragOverSide={(side) => {
+                  if (dropTarget?.id !== col.id || dropTarget.side !== side) setDropTarget({ id: col.id, side });
+                }}
+                onDrop={(sourceId, side) => {
+                  dropColumn(sourceId, col.id, side);
+                  setDragColumnId(null);
+                  setDropTarget(null);
+                }}
+                onResizePreview={(px) => previewColumnWidth(col.id, px)}
+                onResizeCommit={(px) => setColumnWidth(col.id, px)}
+                onResizeCancel={() => containerRef.current?.style.setProperty('--dt-cols', gridTemplate)}
+                hasCustomWidth={columnWidths[col.id] != null}
+              >
+              <DropdownMenu.Root>
                 <DropdownMenu.Trigger asChild>
                   <button
                     type="button"
-                    className="flex items-center gap-1 px-1 py-0.5 hover:bg-[var(--color-surface)] text-left"
+                    className="flex items-center gap-1 min-w-0 px-1 py-0.5 hover:bg-[var(--color-surface)] text-left"
                     style={{ borderRadius: 'var(--border-radius-md)' }}
                   >
-                    <span>{col.label}</span>
+                    <span className="min-w-0 truncate">{col.label}</span>
                     {activeSort === 'asc' && <ChevronUp className="w-3 h-3" />}
                     {activeSort === 'desc' && <ChevronDown className="w-3 h-3" />}
                     {isFiltered && <Filter className="w-3 h-3 signal-text-primary" />}
@@ -501,11 +661,17 @@ export function DataTable<T, K extends string | number>({
                       onChange={(v) => setFilter(col.id, v)}
                     />
                   )}
+                  {columnWidths[col.id] != null && (
+                    <DropdownMenu.Item onSelect={() => setColumnWidth(col.id, null)}>
+                      <RotateCcw className="w-4 h-4" />Standardbreite
+                    </DropdownMenu.Item>
+                  )}
                   <DropdownMenu.Item onSelect={() => setColumnVisible(col.id, false)} variant="danger">
                     <EyeOff className="w-4 h-4" />Spalte ausblenden
                   </DropdownMenu.Item>
                 </DropdownMenu.Content>
               </DropdownMenu.Root>
+              </HeaderCell>
             );
           })}
           {/* Zahnrad-Spalte: Spalten-Inventar + Gruppieren-Sektion */}
@@ -583,7 +749,7 @@ export function DataTable<T, K extends string | number>({
                       {col.label}
                     </span>
                     <div className="min-w-0 break-words text-sm">
-                      {col.cell ? col.cell(row) : String(col.accessor(row) ?? '')}
+                      {col.cell ? col.cell(row) : formatCellValue(col, row)}
                     </div>
                   </div>
                 ))}
@@ -596,7 +762,7 @@ export function DataTable<T, K extends string | number>({
               key={`r:${String(key)}:${idx}`}
               className={`grid items-center min-w-min px-3 py-2 text-sm border-b border-[var(--color-border)] ${onRowClick ? 'cursor-pointer hover:bg-[var(--color-surface-raised)]' : ''}`}
               style={{
-                gridTemplateColumns: gridTemplate,
+                gridTemplateColumns: 'var(--dt-cols)',
                 background: isChecked ? 'rgba(99,102,241,0.07)' : undefined,
                 paddingLeft: rowIndent,
               }}
@@ -613,7 +779,7 @@ export function DataTable<T, K extends string | number>({
               )}
               {visibleColumns.map((col) => (
                 <div key={col.id} className="min-w-0 truncate">
-                  {col.cell ? col.cell(row) : String(col.accessor(row) ?? '')}
+                  {col.cell ? col.cell(row) : formatCellValue(col, row)}
                 </div>
               ))}
               <div />
@@ -627,6 +793,191 @@ export function DataTable<T, K extends string | number>({
           {footer}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Kopfzeilen-Zelle: Verschieben (Griff) + Breite (rechte Kante) ──────────
+
+/** MIME-Typ fürs Drag & Drop — fremde Drags (Dateien, Text) ignoriert die Kopfzeile. */
+const DRAG_MIME = 'application/x-efa-datatable-column';
+
+/**
+ * Hält Hover- und Zieh-Zustand lokal, damit Mausbewegungen in der Kopfzeile
+ * nicht die ganze Tabelle neu rendern. Layout bewusst über Inline-Styles:
+ * Apps, deren Tailwind das SDK nicht scannt, erzeugen neue Klassen nicht.
+ */
+function HeaderCell({
+  columnId, label, dragColumnId, dropSide, hasCustomWidth,
+  onDragStart, onDragEnd, onDragOverSide, onDrop,
+  onResizePreview, onResizeCommit, onResizeCancel, children,
+}: {
+  columnId: string;
+  label: string;
+  dragColumnId: string | null;
+  dropSide: 'before' | 'after' | null;
+  hasCustomWidth: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDragOverSide: (side: 'before' | 'after') => void;
+  onDrop: (sourceId: string, side: 'before' | 'after') => void;
+  onResizePreview: (px: number) => void;
+  onResizeCommit: (px: number | null) => void;
+  onResizeCancel: () => void;
+  children: React.ReactNode;
+}): React.ReactElement {
+  const cellRef = useRef<HTMLDivElement>(null);
+  const [hovered, setHovered] = useState(false);
+  const [resizing, setResizing] = useState(false);
+  const [handleFocused, setHandleFocused] = useState(false);
+  const resizeStart = useRef<{ x: number; width: number; last: number } | null>(null);
+  // Zeitgeber des verzögerten onDragStart — bricht der Browser den Drag ab,
+  // bevor er feuert, darf er den Zustand nicht nachträglich auf „zieht" setzen.
+  const dragStartTimer = useRef<number | null>(null);
+  const isDragSource = dragColumnId === columnId;
+
+  const sideFor = (clientX: number): 'before' | 'after' => {
+    const r = cellRef.current?.getBoundingClientRect();
+    return r && clientX < r.left + r.width / 2 ? 'before' : 'after';
+  };
+  const acceptsDrag = (e: React.DragEvent): boolean =>
+    dragColumnId != null && e.dataTransfer.types.includes(DRAG_MIME);
+
+  const currentWidth = (): number => cellRef.current?.getBoundingClientRect().width ?? MIN_COLUMN_WIDTH;
+
+  const handle = {
+    onPointerDown: (e: React.PointerEvent<HTMLDivElement>): void => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      const width = currentWidth();
+      resizeStart.current = { x: e.clientX, width, last: width };
+      setResizing(true);
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLDivElement>): void => {
+      const s = resizeStart.current;
+      if (!s) return;
+      s.last = clampColumnWidth(s.width + e.clientX - s.x);
+      onResizePreview(s.last);
+    },
+    onPointerUp: (e: React.PointerEvent<HTMLDivElement>): void => {
+      const s = resizeStart.current;
+      if (!s) return;
+      resizeStart.current = null;
+      setResizing(false);
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+      // Reiner Klick ohne Bewegung legt keine feste Breite an.
+      if (Math.abs(e.clientX - s.x) < 2) { onResizeCancel(); return; }
+      onResizeCommit(s.last);
+    },
+    onPointerCancel: (): void => {
+      resizeStart.current = null;
+      setResizing(false);
+      onResizeCancel();
+    },
+    onDoubleClick: (e: React.MouseEvent): void => {
+      e.stopPropagation();
+      if (hasCustomWidth) onResizeCommit(null);
+    },
+    onKeyDown: (e: React.KeyboardEvent): void => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? -KEYBOARD_RESIZE_STEP : KEYBOARD_RESIZE_STEP;
+      onResizeCommit(clampColumnWidth(currentWidth() + delta));
+    },
+  };
+
+  const showChrome = hovered || resizing || handleFocused;
+  const indicator: React.CSSProperties = {
+    position: 'absolute', top: -8, bottom: -8, width: 2,
+    background: 'var(--color-primary)', pointerEvents: 'none',
+    [dropSide === 'before' ? 'left' : 'right']: -1,
+  };
+
+  return (
+    <div
+      ref={cellRef}
+      data-column-id={columnId}
+      style={{
+        position: 'relative', display: 'flex', alignItems: 'center', minWidth: 0,
+        opacity: isDragSource ? 0.4 : undefined,
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onDragOver={(e) => {
+        if (!acceptsDrag(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (!isDragSource) onDragOverSide(sideFor(e.clientX));
+      }}
+      onDrop={(e) => {
+        if (!acceptsDrag(e)) return;
+        e.preventDefault();
+        const sourceId = e.dataTransfer.getData(DRAG_MIME);
+        if (sourceId) onDrop(sourceId, sideFor(e.clientX));
+      }}
+    >
+      {children}
+      {/* Griff rechts in der Zelle statt links vor dem Label: so bleibt die
+          Beschriftung bündig mit den Datenzellen, und der Platz rechts neben dem
+          (inhaltsbreiten) Trigger ist ohnehin frei. Tastatur: Pfeile im Zahnrad. */}
+      <span
+        draggable
+        aria-hidden
+        title="Spalte verschieben"
+        onDragStart={(e) => {
+          e.dataTransfer.setData(DRAG_MIME, columnId);
+          e.dataTransfer.effectAllowed = 'move';
+          if (cellRef.current) e.dataTransfer.setDragImage(cellRef.current, 8, 8);
+          // Erst nach dem dragstart-Task umrendern: ändert sich das Quell-Element
+          // synchron, bricht Chrome den Drag sofort wieder ab.
+          dragStartTimer.current = window.setTimeout(() => {
+            dragStartTimer.current = null;
+            onDragStart();
+          }, 0);
+        }}
+        onDragEnd={() => {
+          if (dragStartTimer.current != null) window.clearTimeout(dragStartTimer.current);
+          dragStartTimer.current = null;
+          onDragEnd();
+        }}
+        style={{
+          position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+          display: (hovered && !dragColumnId && !resizing) || isDragSource ? 'inline-flex' : 'none',
+          padding: 2, cursor: 'grab', zIndex: 1,
+          color: 'var(--color-text-muted)',
+          background: 'var(--color-surface-raised)',
+          borderRadius: 'var(--border-radius-md)',
+        }}
+      >
+        <GripVertical style={{ width: 12, height: 12 }} />
+      </span>
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={`Breite der Spalte ${label} ändern`}
+        tabIndex={0}
+        title="Ziehen: Breite ändern · Doppelklick: Standardbreite"
+        {...handle}
+        onFocus={() => setHandleFocused(true)}
+        onBlur={() => setHandleFocused(false)}
+        style={{
+          position: 'absolute', top: -8, bottom: -8, right: -4, width: 8,
+          cursor: 'col-resize', touchAction: 'none', zIndex: 2, outline: 'none',
+          display: 'flex', justifyContent: 'center',
+        }}
+      >
+        <span
+          style={{
+            width: 2, height: '100%',
+            background: resizing || handleFocused ? 'var(--color-primary)' : 'var(--color-border)',
+            opacity: showChrome ? 1 : 0,
+            transition: 'opacity 120ms',
+          }}
+        />
+      </div>
+      {dropSide && <span style={indicator} />}
     </div>
   );
 }
