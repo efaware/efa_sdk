@@ -1,6 +1,11 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+/* Das SDK-UI-Kit liefert kein vorgebautes Komponenten-CSS — seine Tailwind-
+   Klassen müssen aus UNSEREM Build kommen. node_modules steht auf der
+   hartkodierten Ignore-Liste von tailwindcss-oxide (greift auch im Docker-
+   Build ohne .gitignore), daher explizit als Quelle eintragen. Glob auf .js:
+   das npm-Paket liefert nur kompiliertes JS, kein src/. */
+@source "../node_modules/@efa-one/sdk/frontend/**/*.js";
 
 /* CSS custom properties – set dynamically by useConvergeAuth from Converge theme */
 :root {
