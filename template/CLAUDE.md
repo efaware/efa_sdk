@@ -423,14 +423,15 @@ import '@efa-one/sdk/frontend/ui/styles.css';
 
 Voraussetzung im Consumer (liefert das Scaffold mit): die Design-Tokens
 (`--color-*`, `--border-radius-*`, aus `converge-tokens.css`, kernel-runtime-
-überschrieben), das Tailwind-Radius-Mapping (`tailwind.config.js`) **und der
-SDK-Pfad in `content`** (`'./node_modules/@efa-one/sdk/frontend/**/*.js'`).
-Fehlt der, entfernt Tailwind alle Klassen, die nur in SDK-Komponenten vorkommen
+überschrieben), das Tailwind-Radius-Mapping (`tailwind.config.js`, per `@config`
+aus `src/index.css` geladen) **und der SDK-Pfad als `@source`** in `src/index.css`
+(`@source "../node_modules/@efa-one/sdk/frontend/**/*.js";`). Das Scaffold läuft auf
+**Tailwind v4** (`@import "tailwindcss"`, PostCSS-Plugin `@tailwindcss/postcss`);
+dessen automatische Quellen-Erkennung überspringt `node_modules`. Fehlt der
+`@source`-Eintrag, fehlen alle Klassen, die nur in SDK-Komponenten vorkommen
 (`fixed`, `z-50` …) — `Dialog`/`RecordDialog` erscheinen dann nicht.
-Apps auf **Tailwind v4** (`@import "tailwindcss"`, z. B. efa-chat) tragen den
-Pfad stattdessen per `@source "../node_modules/@efa-one/sdk/frontend/**/*.js";`
-in die CSS-Einstiegsdatei ein. Die automatische Quellen-Erkennung von v4
-überspringt `node_modules`.
+Bestands-Apps auf Tailwind v3 tragen den Pfad stattdessen in `content` der
+`tailwind.config.js` ein (`'./node_modules/@efa-one/sdk/frontend/**/*.js'`).
 
 | Component | When to use |
 |---|---|
