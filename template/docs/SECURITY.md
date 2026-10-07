@@ -68,9 +68,8 @@ HTTP request → requireAuth (decode app_session) → permission middleware
 
 ### Permission key schema
 
-- `{service_key}.default` – tile visibility / basic usage (auto-created per tile)
-- `{service_key}.admin` – app-level admin (auto-created for internal/network tiles)
-- `{service_key}.<custom>` – additional granular permissions registered by the app via `registerPermissions()` at startup
+- `{service_key}.default` – tile visibility / basic usage (auto-created per tile — the only key the kernel creates itself)
+- `{service_key}.<custom>` – every additional permission, including an app-level `{service_key}.admin`, registered by the app via `registerPermissions()` at startup. Keys the app stops reporting are removed (except `.default`).
 - `converge-admin` – platform-wide admin, **treated as a regular permission key** (no separate `role` field, no special JWT claim)
 
 ### Route-level guards (backend)
