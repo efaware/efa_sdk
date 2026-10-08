@@ -105,6 +105,11 @@ const columns: ColumnDef<Item>[] = [
 <DataTable listId="items.list" rows={items} columns={columns} rowKey={(r) => r.id} persistence={viewPrefs} />
 ```
 
+Columns added later show up in views users saved before (at their natural position) — no
+need to bump `DEFAULT_VIEW_VERSION` and reset everyone's view. Grouped lists open collapsed;
+pass `groupsDefaultExpanded` (e.g. with `initialPrefs={{ groupBy: ['category'] }}`) to start
+with every group expanded while keeping groups the user collapses closed.
+
 ## Build your first app
 
 This repo ships a ready-to-copy app scaffold under [`template/`](./template) — the fastest
@@ -210,6 +215,13 @@ chronologically, groups by day and lets the text filter match the displayed form
 `Date` values without a `type` are formatted as dates too. Custom `cell` renderers stay
 the app's job: use `formatDate`/`formatDateTime`, never `toLocaleDateString` (that is
 where `7.10.2026` comes from). No backend or kernel change.
+
+**1.21.0 — new columns in old views, groups that start open.** A column added to
+`columns` after a user saved their view now appears in that view at its natural position
+(and stays hidden if it has `defaultVisible: false`), and can be dragged like any other —
+before, it was missing until the user reset the view. New prop `groupsDefaultExpanded`:
+groups start expanded; groups the user collapses stay collapsed. No backend or kernel
+change.
 
 ## License
 

@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest';
 import {
   buildRenderItems,
   clampColumnWidth,
+  collectAllGroupKeys,
   defaultPrefsFor,
   formatCellValue,
   gridTemplateFor,
+  isColumnVisible,
   MAX_COLUMN_WIDTH,
   MIN_COLUMN_WIDTH,
+  reconcileOrder,
   reorderColumns,
   groupLabelOf,
   DEFAULT_VIEW_VERSION,
@@ -81,6 +84,57 @@ describe('buildRenderItems', () => {
     const items = buildRenderItems(withEmpty, ['cat'], byId, new Set());
     const labels = items.filter((i) => i.kind === 'group').map((i) => i.label);
     expect(labels[labels.length - 1]).toBe('– ohne –');
+  });
+});
+
+describe('reconcileOrder', () => {
+  it('fügt nachträglich ergänzte Spalten an ihrer natürlichen Position in eine alte Ansicht ein', () => {
+    // gespeichert, bevor es `cat` gab — und vom Nutzer umsortiert
+    expect(reconcileOrder(columns, ['secret', 'name'])).toEqual(['secret', 'cat', 'name']);
+  });
+
+  it('lässt entfernte Spalten fallen und behält die Nutzer-Reihenfolge', () => {
+    expect(reconcileOrder(columns, ['cat', 'gone', 'name', 'secret'])).toEqual(['cat', 'name', 'secret']);
+  });
+
+  it('ist für eine vollständige Reihenfolge die Identität', () => {
+    expect(reconcileOrder(columns, ['name', 'cat', 'secret'])).toEqual(['name', 'cat', 'secret']);
+  });
+});
+
+describe('collectAllGroupKeys', () => {
+  const byId = new Map(columns.map((c) => [c.id, c] as const));
+
+  it('liefert alle Gruppen-Keys aller Ebenen unabhängig vom Aufklapp-Zustand', () => {
+    const keys = collectAllGroupKeys(rows, ['cat', 'name'], byId);
+    expect(keys).toHaveLength(4);
+    expect(keys).toEqual(expect.arrayContaining(['A', 'B']));
+    // Unterebene ist an den Eltern-Key gebunden
+    expect(keys.some((k) => k.startsWith('A') && k.endsWith('Alice') && k !== 'A')).toBe(true);
+  });
+
+  it('ohne groupBy keine Keys', () => {
+    expect(collectAllGroupKeys(rows, [], byId)).toEqual([]);
+  });
+
+  it('bildet für Datumsspalten dieselben Tages-Keys wie buildRenderItems', () => {
+    type D = { id: string; at: string | null };
+    const col: ColumnDef<D> = { id: 'at', label: 'Datum', accessor: (r) => r.at, type: 'datetime' };
+    const docs: D[] = [{ id: 'a', at: '2026-10-07T09:00:00Z' }, { id: 'b', at: '2026-10-07T13:30:00Z' }, { id: 'c', at: null }];
+    const cols = new Map([['at', col]]);
+    const keys = collectAllGroupKeys(docs, ['at'], cols);
+    const labels = buildRenderItems(docs, ['at'], cols, new Set()).map((i) => i.label);
+    expect(new Set(keys)).toEqual(new Set(labels));
+  });
+});
+
+describe('isColumnVisible', () => {
+  it('nimmt die gespeicherte Wahl, sonst den Code-Default (auch für später ergänzte Spalten)', () => {
+    const secret = columns[2]; // defaultVisible: false
+    expect(isColumnVisible(secret, {})).toBe(false);
+    expect(isColumnVisible(secret, { secret: true })).toBe(true);
+    expect(isColumnVisible(columns[0], {})).toBe(true);
+    expect(isColumnVisible(columns[0], { name: false })).toBe(false);
   });
 });
 
