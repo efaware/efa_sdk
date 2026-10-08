@@ -328,7 +328,8 @@ Funktion noch einmal nachfragen.
 - IPC-Grundgerüst (`CONVERGE_GO_BACK`, `CONVERGE_DECLARE_APP_INFO`)
 - Pflicht-`reportEvent` nach jeder DB-Schreiboperation — laut Doku verbindlich;
   Frage 3 verfeinert nur, **was** geloggt wird, nicht **ob**
-- Standard-Permissions `.default` und `.admin` (automatisch via Tile)
+- Standard-Permission `.default` (automatisch via Tile — die einzige, die der Kernel selbst anlegt;
+  alles Weitere kommt aus Frage 1 über `registerPermissions()`)
 - Build-Pflicht, Network-Setup, Cookie-Namen — fest verdrahtet
 - **Stack-Variante (Standard 3-Container/PostgreSQL vs. Single-Container/SQLite):** wird im
   `/new-app`-Pre-Intake einmalig festgelegt (siehe Abschnitt „Stack-Varianten" oben) und
@@ -423,14 +424,15 @@ import '@efa-one/sdk/frontend/ui/styles.css';
 
 Voraussetzung im Consumer (liefert das Scaffold mit): die Design-Tokens
 (`--color-*`, `--border-radius-*`, aus `converge-tokens.css`, kernel-runtime-
-überschrieben), das Tailwind-Radius-Mapping (`tailwind.config.js`) **und der
-SDK-Pfad in `content`** (`'./node_modules/@efa-one/sdk/frontend/**/*.js'`).
-Fehlt der, entfernt Tailwind alle Klassen, die nur in SDK-Komponenten vorkommen
+überschrieben), das Tailwind-Radius-Mapping (`tailwind.config.js`, per `@config`
+aus `src/index.css` geladen) **und der SDK-Pfad als `@source`** in `src/index.css`
+(`@source "../node_modules/@efa-one/sdk/frontend/**/*.js";`). Das Scaffold läuft auf
+**Tailwind v4** (`@import "tailwindcss"`, PostCSS-Plugin `@tailwindcss/postcss`);
+dessen automatische Quellen-Erkennung überspringt `node_modules`. Fehlt der
+`@source`-Eintrag, fehlen alle Klassen, die nur in SDK-Komponenten vorkommen
 (`fixed`, `z-50` …) — `Dialog`/`RecordDialog` erscheinen dann nicht.
-Apps auf **Tailwind v4** (`@import "tailwindcss"`, z. B. efa-chat) tragen den
-Pfad stattdessen per `@source "../node_modules/@efa-one/sdk/frontend/**/*.js";`
-in die CSS-Einstiegsdatei ein. Die automatische Quellen-Erkennung von v4
-überspringt `node_modules`.
+Bestands-Apps auf Tailwind v3 tragen den Pfad stattdessen in `content` der
+`tailwind.config.js` ein (`'./node_modules/@efa-one/sdk/frontend/**/*.js'`).
 
 | Component | When to use |
 |---|---|
@@ -760,10 +762,13 @@ nachdem mehrere Apps inkonsistente Listen produziert haben.
    - Spalte ausblenden
 4. **Zahnrad oben rechts:** `Settings`-Icon öffnet ein Popover mit dem
    **Spalten-Inventar** — alle Spalten inkl. ausgeblendeter, als
-   Checkboxes umschaltbar; Reihenfolge zunächst per Up/Down-Icons
-   (Drag-Reorder optional, Phase 2).
+   Checkboxes umschaltbar; Reihenfolge per Up/Down-Icons. Zusätzlich (ab
+   SDK 1.20.0) in der Kopfzeile: Spalte am Griff (rechts in der Zelle, bei
+   Hover) per Drag & Drop verschieben, Breite an der rechten Kante ziehen
+   (Doppelklick bzw. „Standardbreite" im Spaltenmenü = zurück zum Code-Default,
+   Pfeiltasten auf der fokussierten Kante).
 5. **Benutzer-persistierte Ansicht:** Spalten-Sichtbarkeit, -Reihenfolge,
-   aktive Sortierung und aktive Filter werden **pro Liste pro User**
+   -Breiten, aktive Sortierung und aktive Filter werden **pro Liste pro User**
    persistiert. Persistenz **App-lokal in der App-DB** über die Tabelle
    `{app}_view_preferences` und den injizierten `persistence`-Adapter der
    `DataTable` (`createViewPreferencesClient` aus
@@ -785,6 +790,15 @@ nachdem mehrere Apps inkonsistente Listen produziert haben.
    Der Hook ist zusätzlich als `useIsMobile` aus `@efa-one/sdk/frontend/ui`
    exportiert; App-lokale Kopien davon sind abzulösen, damit die Schwelle
    plattformweit an einer Stelle steht.
+
+**Datumsspalten (ab SDK 1.20.0):** `type: 'date'` (→ `07.10.2026`) bzw.
+`type: 'datetime'` (→ `07.10.2026, 16:30`) an der `ColumnDef` setzen und im
+`accessor` den Rohwert (ISO-String, Epoch-ms, `Date`) liefern — **keinen** `cell`-
+Renderer mit `toLocaleDateString` (der liefert `7.10.2026`). Die Tabelle formatiert
+dann selbst, sortiert chronologisch, gruppiert nach Tag, und der Textfilter trifft
+die angezeigte Schreibweise. Wer trotzdem einen eigenen `cell` braucht (z. B. für
+Styling), formatiert darin über `formatDate`/`formatDateTime` aus
+`@efa-one/sdk/frontend/format` und setzt `type` trotzdem — für Sortierung und Filter.
 
 **Pflichtfeld pro Liste:** stabile `list_id` (z. B. `'invoices.list'`,
 `'users.list'`) als Schlüssel für `view_preferences`. Niemals zufällige
@@ -937,12 +951,16 @@ A cross-app implementation is only done when all points below are true:
 
 ## Berechtigungsobjekte
 
-Jede App erhält beim Anlegen der Kachel in efa-one automatisch zwei Standard-Berechtigungsobjekte:
+Der Kernel legt beim Anlegen der Kachel automatisch **genau ein** Berechtigungsobjekt an:
 
 - `{app_key}.default` – Zugriff (Kachel sichtbar, App nutzbar)
-- `{app_key}.admin` – Admin-Zugriff (nur für interne/network Apps, nicht für externe Weblinks)
 
-Weitere granulare Berechtigungsobjekte können in efa-one angelegt werden, z. B. `{app_key}.can-export`.
+Ein `{app_key}.admin` erzeugt der Kernel **nicht**. Alles darüber hinaus — auch ein
+`{app_key}.admin`, falls die App eine Admin-Ebene braucht — registriert die App selbst über
+`registerPermissions()` beim Start (siehe unten). `x-converge.default_permissions` in der
+OpenAPI-Spec legt nichts an, sondern ist rein informativ.
+
+Weitere granulare Berechtigungsobjekte, z. B. `{app_key}.can-export`, meldet die App ebenfalls über `registerPermissions()`.
 Key-Schema: `{app-slug}.{permission}` – Wahl des Suffix ist frei.
 
 ### Dynamische Permission-Registrierung
@@ -966,7 +984,8 @@ await registerPermissions('myapp', [
 **Verhalten:**
 - Neue Permissions werden angelegt, bestehende aktualisiert
 - Von der App nicht mehr gemeldete Custom-Permissions werden automatisch entfernt
-- Die built-in `.default` / `.admin` Objekte bleiben immer erhalten
+- Das built-in `.default`-Objekt bleibt immer erhalten — **jeder andere** Key, den die App nicht
+  (mehr) meldet, wird entfernt. Ein `.admin` überlebt also nur, wenn die App ihn selbst registriert.
 - Fehlgeschlagene Registrierung wird geloggt, blockiert aber nicht den App-Start (fire-and-forget mit Retry)
 
 ### Custom Permission Objects (User-erzeugt, zur Laufzeit)
@@ -1073,6 +1092,8 @@ import { requireAdminOrPermission, requirePermission, requireAdmin } from '../mi
 // Standard: Admin (converge-admin) ODER eine der angegebenen App-Permissions:
 router.delete('/:id', requireAdminOrPermission('myapp.admin'), handler);
 router.get('/items', requireAdminOrPermission('myapp.read', 'myapp.admin'), handler);
+// myapp.read / myapp.admin existieren nur, wenn die App sie per registerPermissions() meldet —
+// sonst kommt hier ausschließlich converge-admin durch.
 
 // Reine App-Permission (ohne Admin-Bypass, selten):
 router.get('/export', requirePermission('myapp.can-export'), handler);
@@ -1090,7 +1111,7 @@ JWT-Caching.
 | Situation | Ergebnis |
 |---|---|
 | User hat Rolle mit `app.default` | Kachel sichtbar, `app.default` ist im Live-Lookup-Result |
-| User hat Rollen mit `app.default` + `app.admin` | Beide Keys werden zurückgegeben |
+| User hat Rollen mit `app.default` + `app.admin` (von der App registriert) | Beide Keys werden zurückgegeben |
 | User hat keine Rolle mit `app.*` | Kachel unsichtbar |
 | User hat Permission `converge-admin` | Sieht alle Kacheln; alle `requireAdminOrPermission` lassen ihn durch |
 | Kachel hat kein Berechtigungsobjekt (Altdaten) | Nur für Inhaber von `converge-admin` sichtbar |
@@ -1200,7 +1221,7 @@ Damit das funktioniert, **muss** jede Template-App `/api/openapi.json` anbieten.
 | `display_name` | ja | Im Dashboard sichtbarer Titel der Kachel. |
 | `suggested_icon` | nein | Lucide-Icon-Name. Fallback: `Package`. Admin kann beim Installieren überschreiben. |
 | `default_app_type` | nein | `internal` (iframe, Default), `network` (neuer Tab, gleiche Infra), `external` (externes Weblink). |
-| `default_permissions` | nein | Liste von Permission-Objekten, die beim Install zusätzlich zu `.default` / `.admin` angelegt werden. |
+| `default_permissions` | nein | Rein informativ: Liste der Permission-Objekte, die die App über `registerPermissions()` meldet. Der Kernel gibt sie beim Install nur im Response zurück und legt **nichts** an — angelegt wird beim App-Start über `registerPermissions()`. Synchron zu `backend/src/index.ts` halten. |
 
 ### Spec aktuell halten
 

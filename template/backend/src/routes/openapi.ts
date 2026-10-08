@@ -29,7 +29,8 @@ router.get('/', (_req: Request, res: Response) => {
       suggested_icon: 'Package',
       default_app_type: 'internal',
       default_permissions: [
-        // Zusätzlich zu den automatischen .default / .admin Objekten.
+        // Rein informativ: der Kernel legt hieraus nichts an (automatisch nur .default),
+        // angelegt wird über registerPermissions() in backend/src/index.ts.
         // Format: { key, displayName, level } – key ohne service-Prefix.
         // INTAKE: docs/intake.md §1 — synchron zu backend/src/index.ts:registerPermissions().
         // { key: 'readonly', displayName: 'Nur Lesen', level: 1 },
