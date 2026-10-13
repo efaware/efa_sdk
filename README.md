@@ -14,7 +14,7 @@ sub-paths — this keeps `express` out of the frontend and `react` out of the ba
 |---|---|---|
 | `@efa-one/sdk/backend` | Node/Express | Auth + token exchange (`requireAuth`, `createExchangeRouter`, `requireInternalOrAuth` …), health router, service discovery + gateway client (`serviceClient`, `resolveService`), clients for audit/reporting/mail/notifications, permission resolution/registration (`getUserPermissions`, `registerPermissions`, `checkPermission`), capability registry (`registerApiMetadata`), backend i18n |
 | `@efa-one/sdk/frontend` | Browser/React | postMessage IPC (`registerAppInfo`, `sendAtStart`, `navigateToApp`, `notifyRouteChange` …), react-i18next factory (`initI18n`), `DevHeader` |
-| `@efa-one/sdk/frontend/ui` | Browser/React | The efa-one design-system kit: `Button`, `Input`, `Badge`, `Alert`, `Dialog`, `DropdownMenu`, `Tooltip`, `EmptyState`, `Skeleton`, `RecordDialog`, and the **`DataTable`** (sortable/filterable/groupable list with draggable, resizable columns and a per-user persisted view; reflows to stacked cards below 640px). Also exports `useIsMobile` — the platform-wide 640px breakpoint hook. Ship its companion CSS once: `import '@efa-one/sdk/frontend/ui/styles.css'` |
+| `@efa-one/sdk/frontend/ui` | Browser/React | The efa-one design-system kit: `Button`, `Input`, `Badge`, `Alert`, `Dialog`, `DropdownMenu`, `Tooltip`, `EmptyState`, `Skeleton`, `RecordDialog`, and the **`DataTable`** (sortable/filterable/groupable list with draggable, resizable columns, a per-user persisted view and CSV/Excel export of the current view; reflows to stacked cards below 640px). Also exports `useIsMobile` — the platform-wide 640px breakpoint hook. Ship its companion CSS once: `import '@efa-one/sdk/frontend/ui/styles.css'` |
 | `@efa-one/sdk/frontend/format` | Browser | Platform-wide date/time display — `formatDate` (`01.09.2026`), `formatDateTime` (`01.09.2026, 11:05`), `formatTime`, `formatFileStamp`, `localeForLanguage`. Always use these instead of `toLocaleDateString`/`toLocaleString`: without an options object those render `1.9.2026`, and without a locale argument they follow the browser language (`9/1/2026`) |
 | `@efa-one/sdk/frontend/viewPreferences` | Browser/React | Persistence seam for `DataTable` — `createViewPreferencesClient()` (standard `/api/view-preferences/:listId` adapter) + `useViewPreferences()` |
 
@@ -222,6 +222,22 @@ where `7.10.2026` comes from). No backend or kernel change.
 before, it was missing until the user reset the view. New prop `groupsDefaultExpanded`:
 groups start expanded; groups the user collapses stay collapsed. No backend or kernel
 change.
+
+**1.22.0 — export the current view.** The DataTable's gear menu now has „Excel" and
+„CSV" buttons. Both export exactly what the user sees: filtered and sorted rows (in
+group order when grouped, collapsed groups included), visible columns in their order.
+CSV uses `;` as separator, `,` as decimal mark and a UTF-8 BOM, so German Excel opens
+it by double-click; text that starts like a formula is prefixed with `'`. The .xlsx is
+written without a dependency (stored ZIP): bold, light-grey header row with thin
+borders, frozen, with autofilter; numbers and dates are real Excel values
+(`dd.mm.yyyy`). Values come from `accessor`, not from `cell`; multi-select filter
+codes are exported as their labels. New `ColumnDef` fields `exportValue` (own export
+value) and `exportable: false` (leave out, e.g. action columns), new props
+`exportFileName` (default: `listId`, plus a timestamp) and `exportable={false}` (hide
+the export, e.g. without an export permission). `toCsv`/`toXlsx`/`downloadFile` are
+exported for app-side use. CSV is CSV: Excel turns `01067` into `1067` and long digit
+strings into `1,23E+18`, and shows the `'` in front of `+49 …` — point users to the
+Excel export for such data. No backend or kernel change.
 
 ## License
 

@@ -14,6 +14,9 @@
  *      Persistenz wird über die `persistence`-Prop (ViewPreferencesAdapter)
  *      injiziert; ohne Adapter läuft die Ansicht rein In-Memory.
  *   6. Default-Ansicht + „Zurücksetzen"-Button im Zahnrad-Popover
+ *   7. Export der aktuellen Ansicht (Filter, Sortierung, sichtbare Spalten in
+ *      ihrer Reihenfolge) als CSV (`;`) oder Excel im Zahnrad — siehe
+ *      `ColumnDef.exportValue`/`exportable` und die Props `exportable`/`exportFileName`
  *
  * **Datumsspalten** deklarieren `type: 'date'` bzw. `'datetime'`: die Tabelle
  * zeigt dann `DD.MM.YYYY` (bzw. `DD.MM.YYYY, HH:MM`) über `formatDate`/
@@ -41,11 +44,12 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as DropdownMenu from './DropdownMenu.js';
-import { ChevronDown, ChevronUp, ChevronRight, Settings, EyeOff, Filter, RotateCcw, ArrowUp, ArrowDown, Layers, X, GripVertical } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Settings, EyeOff, Filter, RotateCcw, ArrowUp, ArrowDown, Layers, X, GripVertical, Download } from 'lucide-react';
 import { Button } from './Button.js';
 import { useViewPreferences, type ViewPreferencesAdapter } from '../viewPreferences.js';
 import { useIsMobile } from '../useIsMobile.js';
-import { formatDate, formatDateTime, type DateInput } from '../format.js';
+import { formatDate, formatDateTime, formatFileStamp, type DateInput } from '../format.js';
+import { downloadFile, toCsv, toXlsx, trimChar, XLSX_MIME, type ExportCell, type ExportTable } from './tableExport.js';
 
 // Trennzeichen für komposite Gruppen-Keys (Unit Separator — kommt in
 // User-Text nicht vor).
@@ -71,6 +75,12 @@ export interface ColumnDef<T> {
   sortable?: boolean;
   width?: string;                        // CSS grid-template-columns Anteil ('1fr', '120px', …) — Default, bis der User zieht
   defaultVisible?: boolean;              // Default true
+  /** Wert für CSV/Excel, wenn `accessor` nicht taugt (z. B. ein Code, den `cell`
+   *  erst übersetzt). Default: `accessor` — Optionen eines multi-select-Filters
+   *  und boolean-Filter-Labels werden dabei schon auf ihre Beschriftung abgebildet. */
+  exportValue?: (row: T) => string | number | boolean | Date | null | undefined;
+  /** `false` lässt die Spalte im Export weg (z. B. reine Aktions-Spalten). */
+  exportable?: boolean;
 }
 
 interface FilterValue {
@@ -133,6 +143,11 @@ interface DataTableProps<T, K extends string | number> {
    * `@efa-one/sdk/frontend/viewPreferences`.
    */
   persistence?: ViewPreferencesAdapter;
+  /** Export (CSV/Excel) im Zahnrad anbieten. Default true; `false` z. B. ohne
+   *  Export-Berechtigung. */
+  exportable?: boolean;
+  /** Dateiname ohne Endung, ergänzt um einen Zeitstempel. Default: `listId`. */
+  exportFileName?: string;
 }
 
 // ─── Default-Prefs aus den Column-Definitionen ───────────────────────────────
@@ -205,6 +220,58 @@ export function formatCellValue<T>(col: ColumnDef<T>, row: T): string {
     return col.type === 'datetime' ? formatDateTime(v as DateInput) : formatDate(v as DateInput);
   }
   return String(v ?? '');
+}
+
+// ─── Export ──────────────────────────────────────────────────────────────────
+
+/**
+ * Exportwert einer Zelle: Zahlen bleiben Zahlen, Datumswerte echte Datumswerte
+ * (Excel formatiert `DD.MM.YYYY`), alles andere Text. Ohne `exportValue` gilt der
+ * `accessor`; dessen Codes bildet ein multi-select- bzw. boolean-Filter auf seine
+ * Beschriftung ab — so steht im Export, was der Benutzer im Filter sieht.
+ */
+export function exportCellOf<T>(col: ColumnDef<T>, row: T): ExportCell {
+  const v = col.exportValue ? col.exportValue(row) : col.accessor(row);
+  if (v == null || v === '') return null;
+  if (isDateColumn(col, v)) {
+    const t = timeOf(v);
+    if (t != null) return { date: new Date(t), withTime: col.type === 'datetime' };
+    // Unparsbar: aus dem accessor leer (die Tabelle zeigt „—"), ein bewusst
+    // gelieferter exportValue-Text („unbekannt") bleibt dagegen stehen.
+    return col.exportValue ? String(v) : null;
+  }
+  const f = col.exportValue ? undefined : col.filter;
+  if (typeof v === 'boolean') {
+    if (f?.type === 'boolean') return v ? (f.labelTrue ?? 'Ja') : (f.labelFalse ?? 'Nein');
+    return v ? 'Ja' : 'Nein';
+  }
+  if (typeof v === 'number') {
+    if (!Number.isFinite(v)) return null;
+    // Zahlencode mit Filter-Beschriftung (Filter vergleicht per String) → Label.
+    const opt = f?.type === 'multi-select' ? f.options.find((o) => o.value === String(v)) : undefined;
+    return opt ? opt.label : v;
+  }
+  const labelOf = (x: unknown): string => {
+    const s = String(x);
+    return f?.type === 'multi-select' ? (f.options.find((o) => o.value === s)?.label ?? s) : s;
+  };
+  if (Array.isArray(v)) return v.map(labelOf).join(', ');
+  return labelOf(v);
+}
+
+/** Kopfzeile + Werte für den Export; Spalten mit `exportable: false` fallen weg. */
+export function buildExportTable<T>(rows: T[], visibleColumns: ColumnDef<T>[]): ExportTable {
+  const cols = visibleColumns.filter((c) => c.exportable !== false);
+  return {
+    headers: cols.map((c) => c.label),
+    rows: rows.map((r) => cols.map((c) => exportCellOf(c, r))),
+  };
+}
+
+/** Dateiname: Basis (unsichere Zeichen ersetzt) + `_YYYY-MM-DD_HH-MM-SS`. */
+export function exportFileBase(name: string, now: Date = new Date()): string {
+  const base = trimChar(name.trim().replace(/[\\/:*?"<>|\s]+/g, '_'), '_') || 'export';
+  return `${base}_${formatFileStamp(now)}`;
 }
 
 // ─── Spalten-Reihenfolge + -Breite ───────────────────────────────────────────
@@ -294,7 +361,7 @@ export function buildRenderItems<T>(
   rows: T[],
   groupBy: string[],
   columnsById: Map<string, ColumnDef<T>>,
-  expandedGroups: Set<string>,
+  expandedGroups: Set<string> | 'all',
 ): RenderItem<T>[] {
   if (groupBy.length === 0) return rows.map((row) => ({ kind: 'row' as const, row }));
 
@@ -336,7 +403,7 @@ export function buildRenderItems<T>(
     for (const label of labels) {
       const childRows = buckets.get(label)!;
       const key = parentKey ? `${parentKey}${GROUP_KEY_SEP}${label}` : label;
-      const expanded = expandedGroups.has(key);
+      const expanded = expandedGroups === 'all' || expandedGroups.has(key);
       out.push({
         kind: 'group',
         key,
@@ -386,6 +453,7 @@ export function collectAllGroupKeys<T>(
 
 export function DataTable<T, K extends string | number>({
   listId, rows, columns, rowKey, onRowClick, selection, initialPrefs, footer, groupsDefaultExpanded, persistence,
+  exportable = true, exportFileName,
 }: DataTableProps<T, K>): React.ReactElement {
   const defaultPrefs = useMemo(() => defaultPrefsFor(columns, initialPrefs), [columns, initialPrefs]);
   const [prefs, setPrefs, reset] = useViewPreferences<ViewPrefs>(listId, defaultPrefs, persistence);
@@ -602,11 +670,30 @@ export function DataTable<T, K extends string | number>({
     setPrefs({ ...prefs, filters });
   };
 
+  // ── Export ───────────────────────────────────────────────────────────────
+  // Die aktuelle Ansicht: gefilterte + sortierte Zeilen, sichtbare Spalten in
+  // ihrer Reihenfolge. Bei Gruppierung in Gruppen-Reihenfolge, aber unabhängig
+  // davon, welche Gruppen gerade zugeklappt sind.
+  const runExport = (format: 'csv' | 'xlsx'): void => {
+    const exportRows = buildRenderItems(sortedFilteredRows, groupBy, columnsById, 'all')
+      .filter((i) => i.kind === 'row')
+      .map((i) => i.row!);
+    const table = buildExportTable(exportRows, visibleColumns);
+    const base = exportFileBase(exportFileName ?? listId);
+    if (format === 'csv') downloadFile(toCsv(table), `${base}.csv`, 'text/csv;charset=utf-8');
+    else downloadFile(toXlsx(table, exportFileName ?? 'Export'), `${base}.xlsx`, XLSX_MIME);
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
   // Zahnrad (Spalten-/Gruppen-Konfiguration) — mobil sitzt es in der kompakten
   // Toolbar, sonst in der Grid-Kopfzeile. Einmal gebaut, zweimal platziert.
   const gearButton = (
     <ColumnInventoryButton
+      exportInfo={exportable ? {
+        rowCount: sortedFilteredRows.length,
+        hasColumns: visibleColumns.some((c) => c.exportable !== false),
+        run: runExport,
+      } : undefined}
       columns={columns}
       prefs={prefs}
       setColumnVisible={setColumnVisible}
@@ -1194,7 +1281,7 @@ function FilterEditor<T>({
 
 function ColumnInventoryButton<T>({
   columns, prefs, setColumnVisible, moveColumn, reset,
-  groupBy, addGroupBy, removeGroupBy, moveGroupBy, clearGroupBy,
+  groupBy, addGroupBy, removeGroupBy, moveGroupBy, clearGroupBy, exportInfo,
 }: {
   columns: ColumnDef<T>[];
   prefs: ViewPrefs;
@@ -1206,6 +1293,8 @@ function ColumnInventoryButton<T>({
   removeGroupBy: (id: string) => void;
   moveGroupBy: (id: string, dir: -1 | 1) => void;
   clearGroupBy: () => void;
+  /** Fehlt bei `exportable={false}` — dann keine Export-Sektion. */
+  exportInfo?: { rowCount: number; hasColumns: boolean; run: (format: 'csv' | 'xlsx') => void };
 }): React.ReactElement {
   const groupableCandidates = columns.filter((c) => !groupBy.includes(c.id));
   const [open, setOpen] = useState(false);
@@ -1346,6 +1435,31 @@ function ColumnInventoryButton<T>({
             </div>
           );
         })}
+        {exportInfo && (
+          <div className="border-t border-[var(--color-border)] mt-2 pt-2">
+            <div className="text-xs font-semibold mb-1 text-[var(--color-text-muted)] uppercase">Exportieren</div>
+            <div className="text-xs text-[var(--color-text-muted)] px-1 mb-1">
+              Aktuelle Ansicht · {exportInfo.rowCount} {exportInfo.rowCount === 1 ? 'Zeile' : 'Zeilen'}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                disabled={exportInfo.rowCount === 0 || !exportInfo.hasColumns}
+                onClick={() => { exportInfo.run('xlsx'); setOpen(false); }}
+              >
+                <Download className="w-4 h-4" />Excel
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={exportInfo.rowCount === 0 || !exportInfo.hasColumns}
+                title="CSV, Trennzeichen Semikolon"
+                onClick={() => { exportInfo.run('csv'); setOpen(false); }}
+              >
+                <Download className="w-4 h-4" />CSV
+              </Button>
+            </div>
+          </div>
+        )}
         <div className="border-t border-[var(--color-border)] mt-2 pt-2">
           <Button
             variant="ghost"
