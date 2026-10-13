@@ -140,9 +140,21 @@ const WORKBOOK_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"
 <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>`;
 
+/**
+ * Entfernt `ch` an Anfang und Ende. Bewusst ohne `/^x+|x+$/`: die zweite
+ * Alternative probiert bei langen `x`-Folgen jede Startposition neu (quadratisch).
+ */
+export function trimChar(s: string, ch: string): string {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s[start] === ch) start++;
+  while (end > start && s[end - 1] === ch) end--;
+  return s.slice(start, end);
+}
+
 /** Blattname: max. 31 Zeichen, ohne `[]:*?/\`, nicht leer. */
 export function sanitizeSheetName(name: string): string {
-  const cleaned = name.replace(/[[\]:*?/\\]/g, ' ').replace(/^'+|'+$/g, '').trim().slice(0, 31).trim();
+  const cleaned = trimChar(name.replace(/[[\]:*?/\\]/g, ' '), "'").trim().slice(0, 31).trim();
   return cleaned || 'Export';
 }
 

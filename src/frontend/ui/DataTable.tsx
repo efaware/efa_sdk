@@ -49,7 +49,7 @@ import { Button } from './Button.js';
 import { useViewPreferences, type ViewPreferencesAdapter } from '../viewPreferences.js';
 import { useIsMobile } from '../useIsMobile.js';
 import { formatDate, formatDateTime, formatFileStamp, type DateInput } from '../format.js';
-import { downloadFile, toCsv, toXlsx, XLSX_MIME, type ExportCell, type ExportTable } from './tableExport.js';
+import { downloadFile, toCsv, toXlsx, trimChar, XLSX_MIME, type ExportCell, type ExportTable } from './tableExport.js';
 
 // Trennzeichen für komposite Gruppen-Keys (Unit Separator — kommt in
 // User-Text nicht vor).
@@ -270,7 +270,7 @@ export function buildExportTable<T>(rows: T[], visibleColumns: ColumnDef<T>[]): 
 
 /** Dateiname: Basis (unsichere Zeichen ersetzt) + `_YYYY-MM-DD_HH-MM-SS`. */
 export function exportFileBase(name: string, now: Date = new Date()): string {
-  const base = name.trim().replace(/[\\/:*?"<>|\s]+/g, '_').replace(/^_+|_+$/g, '') || 'export';
+  const base = trimChar(name.trim().replace(/[\\/:*?"<>|\s]+/g, '_'), '_') || 'export';
   return `${base}_${formatFileStamp(now)}`;
 }
 

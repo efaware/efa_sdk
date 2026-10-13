@@ -5,6 +5,7 @@ import {
   crc32,
   excelSerial,
   sanitizeSheetName,
+  trimChar,
   toCsv,
   toXlsx,
   zipStore,
@@ -134,6 +135,15 @@ describe('Hilfsfunktionen', () => {
     expect(excelSerial(new Date(2026, 9, 7), false)).toBe(46302);
     expect(excelSerial(new Date(2026, 9, 7, 12, 0), true)).toBe(46302.5);
     expect(excelSerial(new Date(2026, 9, 7, 12, 0), false)).toBe(46302);
+  });
+
+  it('trimChar: nur Rand, auch bei langen Folgen linear', () => {
+    expect(trimChar("''a'b''", "'")).toBe("a'b");
+    expect(trimChar('____', '_')).toBe('');
+    const long = '_'.repeat(200_000) + 'x' + '_'.repeat(200_000) + 'y';
+    const t0 = Date.now();
+    expect(trimChar(long, '_')).toBe(long.slice(200_000));
+    expect(Date.now() - t0).toBeLessThan(200);
   });
 
   it('sanitizeSheetName', () => {
