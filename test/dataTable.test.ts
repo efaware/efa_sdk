@@ -13,6 +13,9 @@ import {
   reorderColumns,
   groupLabelOf,
   DEFAULT_VIEW_VERSION,
+  buildExportTable,
+  exportCellOf,
+  exportFileBase,
   type ColumnDef,
 } from '../src/frontend/ui/DataTable';
 
@@ -73,6 +76,8 @@ describe('buildRenderItems', () => {
     expect(collapsed.filter((i) => i.kind === 'group')).toHaveLength(2);
     expect(collapsed.filter((i) => i.kind === 'row')).toHaveLength(0);
 
+    const all = buildRenderItems(rows, ['cat'], byId, 'all');
+    expect(all.filter((i) => i.kind === 'row').map((i) => i.row!.id)).toEqual(['a', 'b']);
     const expanded = buildRenderItems(rows, ['cat'], byId, new Set(['A']));
     const groupA = expanded.find((i) => i.kind === 'group' && i.label === 'A');
     expect(groupA?.expanded).toBe(true);
@@ -238,5 +243,64 @@ describe('Datumsspalten', () => {
     ];
     const items = buildRenderItems(docs, ['at'], new Map([['at', col]]), new Set());
     expect(items.map((i) => [i.label, i.count])).toEqual([['07.10.2026', 2]]);
+  });
+});
+
+describe('Export', () => {
+  interface Item { id: string; name: string; status: string; tags: string[]; active: boolean; amount: number; at: string | null }
+  const item: Item = { id: '1', name: 'Alpha', status: 'open', tags: ['a', 'b'], active: true, amount: 12.5, at: '2026-10-07T09:00:00Z' };
+  const col = (c: Partial<ColumnDef<Item>> & { id: string }): ColumnDef<Item> =>
+    ({ label: c.id, accessor: (r: Item) => r[c.id as keyof Item], ...c });
+
+  it('Zahl bleibt Zahl, Text bleibt Text, leer → null', () => {
+    expect(exportCellOf(col({ id: 'amount' }), item)).toBe(12.5);
+    expect(exportCellOf(col({ id: 'name' }), item)).toBe('Alpha');
+    expect(exportCellOf(col({ id: 'at' }), { ...item, at: null })).toBeNull();
+    expect(exportCellOf(col({ id: 'amount' }), { ...item, amount: NaN })).toBeNull();
+  });
+
+  it('Datumsspalten als Datum, datetime mit Uhrzeit, unparsbar → null', () => {
+    expect(exportCellOf(col({ id: 'at', type: 'date' }), item))
+      .toEqual({ date: new Date('2026-10-07T09:00:00Z'), withTime: false });
+    expect(exportCellOf(col({ id: 'at', type: 'datetime' }), item))
+      .toEqual({ date: new Date('2026-10-07T09:00:00Z'), withTime: true });
+    expect(exportCellOf(col({ id: 'at', type: 'date' }), { ...item, at: 'kaputt' })).toBeNull();
+  });
+
+  it('bildet Filter-Codes auf ihre Beschriftung ab', () => {
+    const status = col({
+      id: 'status',
+      filter: { type: 'multi-select', options: [{ value: 'open', label: 'Offen' }] },
+    });
+    expect(exportCellOf(status, item)).toBe('Offen');
+    expect(exportCellOf(status, { ...item, status: 'unbekannt' })).toBe('unbekannt');
+    expect(exportCellOf(col({ id: 'tags' }), item)).toBe('a, b');
+    const prio = col({ id: 'amount', filter: { type: 'multi-select', options: [{ value: '12.5', label: 'Hoch' }] } });
+    expect(exportCellOf(prio, item)).toBe('Hoch');
+    expect(exportCellOf(prio, { ...item, amount: 3 })).toBe(3);
+    expect(exportCellOf(col({ id: 'active' }), item)).toBe('Ja');
+    expect(exportCellOf(col({ id: 'active', filter: { type: 'boolean', labelFalse: 'Inaktiv' } }), { ...item, active: false }))
+      .toBe('Inaktiv');
+  });
+
+  it('exportValue hat Vorrang vor accessor', () => {
+    expect(exportCellOf(col({ id: 'name', exportValue: (r) => r.name.toUpperCase() }), item)).toBe('ALPHA');
+    expect(exportCellOf(col({ id: 'at', type: 'date', exportValue: () => 'unbekannt' }), item)).toBe('unbekannt');
+  });
+
+  it('buildExportTable: sichtbare Spalten in Reihenfolge, exportable:false fällt weg', () => {
+    const t = buildExportTable([item], [
+      col({ id: 'name', label: 'Name' }),
+      col({ id: 'id', label: 'Aktionen', exportable: false }),
+      col({ id: 'amount', label: 'Betrag' }),
+    ]);
+    expect(t).toEqual({ headers: ['Name', 'Betrag'], rows: [['Alpha', 12.5]] });
+  });
+
+  it('exportFileBase: unsichere Zeichen raus, Zeitstempel dran', () => {
+    const now = new Date(2026, 9, 13, 9, 5, 7);
+    expect(exportFileBase('access.users.list.v3', now)).toBe('access.users.list.v3_2026-10-13_09-05-07');
+    expect(exportFileBase('Kunden / Aktiv', now)).toBe('Kunden_Aktiv_2026-10-13_09-05-07');
+    expect(exportFileBase('  ', now)).toBe('export_2026-10-13_09-05-07');
   });
 });

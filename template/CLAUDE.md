@@ -790,6 +790,19 @@ nachdem mehrere Apps inkonsistente Listen produziert haben.
    Der Hook ist zusätzlich als `useIsMobile` aus `@efa-one/sdk/frontend/ui`
    exportiert; App-lokale Kopien davon sind abzulösen, damit die Schwelle
    plattformweit an einer Stelle steht.
+8. **Export (ab SDK 1.22.0):** Im Zahnrad stehen „Excel" und „CSV" (Trennzeichen
+   `;`, UTF-8 mit BOM). Exportiert wird immer die **aktuelle Ansicht**: gefilterte
+   und sortierte Zeilen, nur sichtbare Spalten in ihrer Reihenfolge (bei
+   Gruppierung in Gruppen-Reihenfolge, auch zugeklappte Gruppen). Im .xlsx ist die
+   Kopfzeile fett, grau hinterlegt, gerahmt, fixiert und mit Autofilter; Zahlen
+   und Datumswerte sind echte Excel-Werte. Exportiert wird der `accessor`-Wert,
+   nicht der `cell`-Renderer — Codes eines multi-select-Filters erscheinen mit
+   ihrer Beschriftung. Wo der Rohwert nicht taugt: `exportValue` an der Spalte;
+   reine Aktions-Spalten bekommen `exportable: false`. `exportFileName` setzt den
+   Dateinamen (sonst die `listId`), `exportable={false}` an der Tabelle blendet den
+   Export aus (z. B. ohne `{app}.can-export`). CSV-typisch verliert Excel beim
+   Öffnen führende Nullen (PLZ `01067`) und Stellen langer Ziffernfolgen und zeigt
+   das Schutz-`'` vor `+49 …` an — für solche Daten den Excel-Export nehmen.
 
 **Datumsspalten (ab SDK 1.20.0):** `type: 'date'` (→ `07.10.2026`) bzw.
 `type: 'datetime'` (→ `07.10.2026, 16:30`) an der `ColumnDef` setzen und im
