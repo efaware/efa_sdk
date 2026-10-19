@@ -8,13 +8,36 @@ Beim Bearbeiten der App liest Claude diese Datei, BEVOR er Code schreibt — bea
 |---|---|
 | Erstellt | {YYYY-MM-DD} |
 | Beantwortet von | {user_email} |
-| Template-Version | 1.1.0 |
+| Template-Version | 1.15.0 |
 
 > **Status-Kürzel:**
 > ⏳ offen — Frage steht aus
 > ✅ beantwortet — Fachliche Antwort liegt vor
 > 🔧 im Code umgesetzt — Code-Stub / Hook ist platziert
 > ↪ übersprungen — Funktion bewusst nicht genutzt
+
+---
+
+## Grundsatzfrage
+
+### 0. Werkzeug oder Verwaltung
+**Frage:** Soll sich die App etwas merken? (a) Werkzeug: Eingabe rein, Ergebnis raus, danach ist nichts mehr da. (b) Verwaltung: Übersicht aller Einträge, Klick öffnet die Einzelheiten, ändern und löschen möglich. (c) Werkzeug mit Verlauf: erledigt etwas sofort, zeigt aber später, was es wann mit welchem Ergebnis getan hat.
+
+> Muss vom User **ausdrücklich** gewählt werden — Claude empfiehlt und begründet, entscheidet aber nicht. Erklärung und Warnzeichen: `CLAUDE.md` → „Frage 0".
+
+- Status: ⏳ offen
+- Antwort:
+- Begründung (warum diese Form, welche Warnzeichen besprochen wurden):
+- Dinge, die die App sich merkt (nur bei b/c):
+
+  | Ding | Was dazugehört | Hängt zusammen mit |
+  |---|---|---|
+  | | | |
+
+- Ableitung:
+  - (a): eine Seite Eingabe/Ergebnis, keine Fachtabellen
+  - (b): je Ding Tabelle in `schema.sql`, Routen, Übersicht als `DataTable`, Einzelansicht per `RecordDialog`
+  - (c): Vorgangs-Tabelle + Verlaufsübersicht als `DataTable`, Einzelansicht nur lesend
 
 ---
 

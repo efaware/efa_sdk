@@ -1,6 +1,6 @@
 # efa-one App Template
 
-efa-app-template-version: 1.14.0
+efa-app-template-version: 1.15.0
 
 ## What this is
 
@@ -286,7 +286,7 @@ werden?").
 1. **Lies `docs/intake.md`.** Pro Frage: Antwort vorhanden → respektieren und
    überspringen. Antwort fehlt (`Status: ⏳ offen`) → vor dem ersten Code-Diff
    stellen.
-2. **Vorschlag mitliefern.** Bevor du eine Frage stellst, leite aus der
+2. **Vorschlag mitliefern** (Ausnahme: Frage 0, siehe dort). Bevor du eine Frage stellst, leite aus der
    App-Beschreibung (`description` in `package.json` / OpenAPI) eine Vermutung
    ab und formuliere sie so:
    > „Aus der App-Beschreibung **„{description}"** vermute ich
@@ -302,13 +302,86 @@ werden?").
 
 - `Template-Version` in `docs/intake.md` < aktuelle Template-Version → nur die
   neu hinzugekommenen Fragen stellen.
-- Wenn der User „durchlauf den Intake nochmal" sagt → alle 13 Punkte mit den
+- Wenn der User „durchlauf den Intake nochmal" sagt → alle 14 Punkte (0–13) mit den
   vorhandenen Antworten zur Aktualisierung anbieten.
+- Bestands-Apps ohne Frage 0 in `docs/intake.md`: Frage 0 **vor** der nächsten
+  Funktionsänderung stellen, auch wenn die App schon läuft.
 
-### Pflichtfragen (9)
+### Frage 0 — Werkzeug oder Verwaltung? (immer zuerst, nur der User entscheidet)
+
+**Warum es diese Frage gibt:** Wer kein Entwickler ist, beschreibt, was die App *tun*
+soll („mach aus dieser Liste jene", „leg eine Aufgabe im ERP an"), aber fast nie, was
+sie sich *merken* soll. Baust du nur das Beschriebene, entsteht ein Formular, das nach
+dem Schließen alles vergisst. Für manche Apps ist genau das richtig, für andere ist es
+ein Fehler, der erst im Betrieb auffällt — dann fehlt die Übersicht, was die App schon
+getan hat, und das Nachrüsten ist ein halber Umbau.
+
+**Regeln:**
+- Frage 0 kommt **vor allen anderen Fragen und vor dem ersten Code**, auch wenn die
+  Beschreibung eindeutig wirkt.
+- **Nie selbst beantworten.** Du darfst eine Empfehlung geben und begründen, aber der
+  User muss die Antwort ausdrücklich wählen. Ohne ausdrückliche Antwort bleibt der Status
+  `⏳ offen`, und du schreibst keinen Code.
+- **Alltagssprache.** Gegenüber dem User keine Fachbegriffe: nicht „CRUD", „Persistenz",
+  „Datenbank-Schema", „Entität", „Master-Detail", „noun-first". Sag „Übersicht",
+  „Eintrag", „bleibt gespeichert", „merkt sich".
+
+**Die drei Grundformen** (so dem User erklären, jeweils mit einem Beispiel aus seinem
+eigenen Umfeld, wenn du eins kennst):
+
+| Form | So erklärst du sie | Beispiel |
+|---|---|---|
+| **(a) Werkzeug** | Du gibst etwas hinein und bekommst sofort ein Ergebnis. Danach ist nichts mehr da, wie bei einem Taschenrechner. | Eine Excel-Liste hochladen und die umgerechnete Liste herunterladen. |
+| **(b) Verwaltung** | Die App merkt sich Dinge. Du siehst eine Übersicht aller Einträge, klickst einen an, siehst die Einzelheiten und kannst ihn ändern oder löschen, wie eine Kartei. | Aufgaben, Kunden, Geräte, Anfragen. |
+| **(c) Werkzeug mit Verlauf** | Die App erledigt etwas sofort, schreibt aber mit, was sie getan hat. Du siehst später eine Übersicht aller bisherigen Vorgänge: wann, von wem, mit welchem Ergebnis. | Aufträge, die an ein anderes System übergeben werden. |
+
+**Warnzeichen — wann ein reines Werkzeug (a) nicht reicht.** Prüfe die Beschreibung
+darauf. Trifft eines zu, sag es dem User konkret, an seinem eigenen Beispiel, und
+erkläre die Folge im Alltag:
+
+1. **Das Ergebnis landet in einem anderen System** (ERP, E-Mail, Kalender, Ablage).
+   → „Woher weißt du nächste Woche, welche Aufgaben die App angelegt hat und ob das
+   geklappt hat? Wie verhinderst du, dass dieselbe Aufgabe zweimal angelegt wird?"
+2. **Etwas hat einen Zustand oder eine Frist** (offen, erledigt, fällig am …).
+3. **Mehrere Personen arbeiten damit**, oder jemand anderes macht später weiter.
+4. **Man will später nachsehen, suchen, korrigieren oder löschen.**
+5. **Ein Fehler darf nicht unbemerkt verloren gehen** (z. B. eine Übergabe, die
+   fehlgeschlagen ist).
+
+Trifft **keines** zu (reine Umrechnung, Berechnung, einmalige Aufbereitung), ist das
+Werkzeug richtig — sag das auch so und dräng keine Übersicht auf.
+
+**Formulierungsvorlage:**
+
+> „Bevor ich anfange, eine Grundsatzfrage, die bestimmt, wie die App aufgebaut wird:
+> Soll sich die App etwas merken? Es gibt drei Möglichkeiten: {a/b/c in Alltagssprache}.
+> Bei deiner Beschreibung „{Beschreibung}" fällt mir auf: {Warnzeichen, konkret}. Ohne
+> Übersicht würde das bedeuten: {Folge im Alltag}. Deshalb würde ich {Empfehlung}
+> bauen. Später umzustellen geht, ist aber deutlich mehr Arbeit als jetzt. Wie soll es
+> sein?"
+
+Frag per `AskUserQuestion` mit den drei Formen als Optionen (deine Empfehlung zuerst,
+mit Begründung in der Beschreibung).
+
+**Bei (b) oder (c) direkt nachfragen:** „Welche Dinge soll die App sich merken, und was
+gehört zu jedem davon?" — z. B. „Aufgabe: Titel, zuständige Person, Fälligkeit, ob sie im
+ERP angekommen ist". Hängen Dinge zusammen (Positionen gehören zu einem Auftrag), frag
+das mit. Antworten in `docs/intake.md §0` eintragen.
+
+**Was du daraus ableitest:**
+
+| Antwort | Umsetzung |
+|---|---|
+| (a) Werkzeug | Eine Seite mit Eingabe und Ergebnis. Keine Tabelle in der Datenbank für Fachdaten, keine `DataTable`. Frage 2 und Frage 4 meist `↪ entfällt (Werkzeug)`. |
+| (b) Verwaltung | Je genanntem Ding: Tabelle in `schema.sql` (mit `tenant`, ggf. `owner_id`), Routen zum Auflisten, Lesen, Anlegen, Ändern, Löschen, Übersicht als `DataTable` (siehe „Listen-Verhalten") und Einzelansicht per `RecordDialog` (siehe „Detail-Dialog-Pattern"). `reportEvent` nach jedem Schreibvorgang. |
+| (c) Werkzeug mit Verlauf | Die Werkzeug-Seite plus eine Vorgangs-Tabelle (Zeitpunkt, ausgelöst von, kurze Beschreibung der Eingabe, Ergebnis/Status, Fehlertext). Übersicht der Vorgänge als `DataTable`, Einzelansicht nur lesend. Fehlgeschlagene Vorgänge sichtbar markieren. |
+
+
+
+### Pflichtfragen (9) — nach Frage 0
 
 Reihenfolge ist verbindlich. Wenn `/new-app` schon einen Pre-Intake gemacht hat
-(Fragen 1, 2, 7, 8, 9 — alles, was direkt aufs Scaffolding wirkt), starte beim
+(Fragen 0, 1, 2, 7, 8, 9 — alles, was direkt aufs Scaffolding wirkt), starte beim
 ersten unbeantworteten Punkt.
 
 | # | Frage (in Du-Form, Deutsch) | Vorgeschlagene Optionen | Was du daraus ableitest |
@@ -356,7 +429,12 @@ Funktion noch einmal nachfragen.
 
 Eine App ist „fachlich vollständig" wenn:
 
-- alle 9 Pflichtfragen in `docs/intake.md` Status ≥ `✅ beantwortet` haben
+- Frage 0 vom User **ausdrücklich** beantwortet ist (nicht von dir abgeleitet)
+- bei Frage 0 = (b): für jedes genannte Ding Übersicht (`DataTable`), Einzelansicht
+  (`RecordDialog`) und Speichern in der App-Datenbank existieren
+- bei Frage 0 = (c): Vorgangs-Tabelle + Verlaufsübersicht existieren
+- alle 9 Pflichtfragen in `docs/intake.md` Status ≥ `✅ beantwortet` haben (oder bei
+  Frage 0 = (a) begründet `↪ entfällt`)
 - bedingte Fragen 10–13 entweder beantwortet oder als „↪ übersprungen" markiert sind
 - `registerPermissions(...)` in `backend/src/index.ts` Frage 1 reflektiert
 - `x-converge.default_permissions` in `routes/openapi.ts` synchron zu Frage 1 ist

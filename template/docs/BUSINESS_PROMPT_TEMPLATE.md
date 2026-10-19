@@ -12,6 +12,18 @@ Ich beschreibe nur die Fachlogik. Du nutzt das app-template und arbeitest im reg
 - Was soll der Nutzer fachlich erreichen?
 - Wann beginnt/endet der Prozess?
 
+## Soll sich die App etwas merken?
+Wähle eine Form und schreib einen Satz, warum:
+- [ ] **Werkzeug:** Ich gebe etwas hinein und bekomme sofort ein Ergebnis. Danach muss nichts gespeichert bleiben (z. B. eine Excel-Liste umrechnen).
+- [ ] **Verwaltung:** Die App soll sich Dinge merken. Ich will eine Übersicht aller Einträge, einen anklicken, die Einzelheiten sehen, ändern oder löschen (z. B. Aufgaben, Kunden, Geräte).
+- [ ] **Werkzeug mit Verlauf:** Die App erledigt etwas sofort, ich will aber später sehen, was sie wann mit welchem Ergebnis getan hat (z. B. Aufgaben, die im ERP angelegt werden).
+
+Wenn Verwaltung oder Verlauf: Welche Dinge soll sich die App merken, und was gehört zu jedem davon?
+- <Ding 1>: <was dazugehört>
+- <Ding 2>: <was dazugehört>
+
+Tipp: Landet das Ergebnis in einem anderen System, hat etwas einen Zustand (offen/erledigt) oder arbeiten mehrere Personen damit, reicht ein reines Werkzeug fast nie.
+
 ## Rollen
 - Welche Rollen gibt es (z. B. Sachbearbeitung, Teamleitung)?
 - Wer darf was sehen oder auslösen?
@@ -46,6 +58,8 @@ Wichtig:
 
 ## Minimum information needed before implementation
 
+- Grundform der App (Werkzeug / Verwaltung / Werkzeug mit Verlauf), vom User gewählt
+- Bei Verwaltung/Verlauf: die Dinge, die gespeichert werden, mit ihren Angaben
 - Confirmed `service_key` list
 - Expected data objects/fields per service
 - Read/write scope per service
