@@ -126,7 +126,8 @@ async function startServer(): Promise<void> {
       log('info', `Server started`, { port: PORT, environment: process.env.ENVIRONMENT ?? 'development' });
 
       // ── Custom Permissions bei Converge registrieren ─────────────────────
-      // Zusätzlich zu den automatischen .default / .admin Berechtigungen.
+      // Der Kernel legt automatisch nur .default an — jede weitere Permission
+      // (auch ein .admin) muss hier gemeldet werden; nicht gemeldete Keys entfernt er.
       // Array leer lassen wenn die App keine feingranularen Permissions braucht.
       // INTAKE: docs/intake.md §1 — Liste muss synchron zu §1 + zu
       //   routes/openapi.ts:x-converge.default_permissions sein.

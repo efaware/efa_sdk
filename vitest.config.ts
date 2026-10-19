@@ -36,7 +36,8 @@ const perFileThresholds = {
   // Ratchet Auth-Handshake (CONVERGE_AUTH_REQUEST): Ist L 87.8 / S 85.1 / F 76 / B 80.4.
   'src/frontend/ipc.ts': { lines: 87, statements: 84, functions: 75, branches: 79 },
   'src/frontend/viewPreferences.ts': { lines: 25, statements: 22, functions: 35, branches: 28 },
-  'src/frontend/ui/DataTable.tsx': { lines: 15, statements: 15, functions: 9, branches: 9 },
+  // Ratchet Spalten ziehen/verschieben + Datumsspalten: Ist L 20.7 / S 21.4 / F 13.4 / B 20.5.
+  'src/frontend/ui/DataTable.tsx': { lines: 20, statements: 20, functions: 12, branches: 19 },
   'src/frontend/format.ts': { lines: 100, statements: 100, functions: 100, branches: 90 },
 };
 

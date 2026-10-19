@@ -1,6 +1,6 @@
 # efa-one App Template
 
-efa-app-template-version: 1.13.1
+efa-app-template-version: 1.14.0
 
 ## What this is
 
@@ -54,9 +54,9 @@ prüfen. Vor jedem `npm install <paket>` bzw. `apk add`:
    Ist es ein natives Modul? Dann bewusst entscheiden + isolieren.
 
 Keine `DEPENDENCIES.md` pflegen — der Dependency-Nachweis lebt in `package-lock.json`
-+ `npm audit`. CVEs und Lizenzen prüft die CI automatisch (Dependabot, Trivy,
-`license-checker` — Copyleft GPL/AGPL/LGPL failt den Build). Der einzige manuelle
-Schritt ist die Notwendigkeitsfrage (Punkt 1).
++ `npm audit`. Wer die mitgelieferten Workflows nutzt, bekommt CVE- und Lizenzprüfung
+automatisch (Dependabot, Trivy, `license-checker` — Copyleft GPL/AGPL/LGPL failt den Build);
+ohne sie deckt `scripts/ci-local.sh` dieselben Prüfungen lokal ab.
 
 #### `overrides` in `backend/package.json` — warum, und wann sie wieder weg darf
 
@@ -104,11 +104,28 @@ Failure policy:
 The Dockerfile sets `ENVIRONMENT=production`. The `/dev/token` route only registers
 when `ENVIRONMENT !== 'production'`. Never change this.
 
+### CI/CD ist nicht deine Aufgabe — außer der User verlangt es ausdrücklich
+Eine App braucht für efa one **keine CI/CD-Pipeline**. Die einzige Voraussetzung fürs
+Installieren: Container-Images aus den mitgelieferten Dockerfiles liegen in einer Registry,
+die die Instanz lesen darf (siehe README → „Ausliefern"). Wie die Images dorthin kommen
+(mitgelieferter `docker-image.yml`, eigene Pipeline oder `docker build` + `docker push`),
+entscheidet der Betreiber des Repos.
+
+Deshalb:
+- **Keine Workflows anlegen, erweitern oder „vervollständigen"**, keine Branch-Protection,
+  kein Dependabot, kein Auto-merge, keine Signatur-Einrichtung vorschlagen oder umsetzen,
+  solange der User nicht ausdrücklich danach fragt.
+- Die Dateien unter `.github/` sind der **interne Qualitätsstandard von efa one** für die
+  eigenen Apps und für alle anderen eine **Empfehlung**. Sie dürfen bleiben, angepasst oder
+  gelöscht werden — nichts davon prüft efa one beim Installieren.
+- Was zählt, ist lokal prüfbar: `npm test`, `npm run typecheck`, `docker compose up -d --build`;
+  `scripts/ci-local.sh` als empfohlener Sicherheits-/Lizenz-Check.
+
 ### Tests: die mitgelieferte Basis erweitern, nicht ersetzen
 
 Das Scaffold kommt mit einer **laufenden Testsuite** — `npm test` ist ab dem ersten
-Commit grün, es gibt kein `--passWithNoTests`. Verbindlicher Standard ist die
-`TESTING.md` des Meta-Repos; hier nur, was für diese App-Vorlage gilt:
+Commit grün, es gibt kein `--passWithNoTests`. (Für die efa-one-eigenen Apps gilt
+zusätzlich die interne `TESTING.md`; hier nur, was für diese App-Vorlage gilt.)
 
 | Ort | Inhalt |
 |---|---|
@@ -125,8 +142,8 @@ transpiliert und dabei **nicht** typprüft, gibt es dafür `tsconfig.test.json` 
 Zwei Kommandos:
 
 ```bash
-npm test              # schnell, alles gemockt — läuft im Stop-Hook und im PR-Gate
-npm run test:coverage # dieselbe Suite + Coverage-Gate (so läuft die CI)
+npm test              # schnell, alles gemockt
+npm run test:coverage # dieselbe Suite + Coverage-Schwellen
 ```
 
 **Coverage-Ratchet:** In `vitest.config.ts` steht ein globaler Floor plus Per-Datei-Gates
@@ -155,7 +172,7 @@ Wahl betrifft nur Container-Zuschnitt und Datenbank.
 | Compose | `docker-compose.yml` | `docker-compose.single.yml` |
 | Dockerfile(s) | `backend/Dockerfile` + `frontend/Dockerfile` | `Dockerfile.single` |
 | Schema | `backend/src/db/schema.sql` | `backend/src/db/schema.sqlite.sql` |
-| CI-Workflow | `.github/workflows/docker-image.yml` | `…/docker-image.single.yml` (umbenennen) |
+| Build-Workflow (optional) | `.github/workflows/docker-image.yml` | `…/docker-image.single.yml` (umbenennen) |
 | SPA-Auslieferung | Frontend-nginx | Backend via `express.static` (`SERVE_STATIC=true`) |
 
 **Wann welche Variante? (verbindliche Entscheidungsregel)**
@@ -192,8 +209,8 @@ Nimm **Standard-Stack + PostgreSQL**, wenn **eines** zutrifft:
 
 **Beim Umstieg auf den Single-Container-Stack** (oder beim Scaffolding einer Single-Container-App):
 - `docker-compose.single.yml` als `docker-compose.yml` verwenden, die 3-Container-Variante entfernen.
-- `.github/workflows/docker-image.single.yml` → `docker-image.yml` umbenennen, die alte löschen
-  (sonst doppelter Build beim Tag-Push).
+- Falls der mitgelieferte Build-Workflow genutzt wird: `.github/workflows/docker-image.single.yml`
+  → `docker-image.yml` umbenennen, die alte löschen (sonst doppelter Build beim Tag-Push).
 - `schema.sqlite.sql` pflegen (SQLite-Dialekt: TEXT-IDs, `CURRENT_TIMESTAMP`); `schema.sql`
   kann entfernt werden. Strukturierte Werte selbst als TEXT serialisieren (kein JSONB).
 
@@ -328,7 +345,8 @@ Funktion noch einmal nachfragen.
 - IPC-Grundgerüst (`CONVERGE_GO_BACK`, `CONVERGE_DECLARE_APP_INFO`)
 - Pflicht-`reportEvent` nach jeder DB-Schreiboperation — laut Doku verbindlich;
   Frage 3 verfeinert nur, **was** geloggt wird, nicht **ob**
-- Standard-Permissions `.default` und `.admin` (automatisch via Tile)
+- Standard-Permission `.default` (automatisch via Tile — die einzige, die der Kernel selbst anlegt;
+  alles Weitere kommt aus Frage 1 über `registerPermissions()`)
 - Build-Pflicht, Network-Setup, Cookie-Namen — fest verdrahtet
 - **Stack-Variante (Standard 3-Container/PostgreSQL vs. Single-Container/SQLite):** wird im
   `/new-app`-Pre-Intake einmalig festgelegt (siehe Abschnitt „Stack-Varianten" oben) und
@@ -423,14 +441,15 @@ import '@efa-one/sdk/frontend/ui/styles.css';
 
 Voraussetzung im Consumer (liefert das Scaffold mit): die Design-Tokens
 (`--color-*`, `--border-radius-*`, aus `converge-tokens.css`, kernel-runtime-
-überschrieben), das Tailwind-Radius-Mapping (`tailwind.config.js`) **und der
-SDK-Pfad in `content`** (`'./node_modules/@efa-one/sdk/frontend/**/*.js'`).
-Fehlt der, entfernt Tailwind alle Klassen, die nur in SDK-Komponenten vorkommen
+überschrieben), das Tailwind-Radius-Mapping (`tailwind.config.js`, per `@config`
+aus `src/index.css` geladen) **und der SDK-Pfad als `@source`** in `src/index.css`
+(`@source "../node_modules/@efa-one/sdk/frontend/**/*.js";`). Das Scaffold läuft auf
+**Tailwind v4** (`@import "tailwindcss"`, PostCSS-Plugin `@tailwindcss/postcss`);
+dessen automatische Quellen-Erkennung überspringt `node_modules`. Fehlt der
+`@source`-Eintrag, fehlen alle Klassen, die nur in SDK-Komponenten vorkommen
 (`fixed`, `z-50` …) — `Dialog`/`RecordDialog` erscheinen dann nicht.
-Apps auf **Tailwind v4** (`@import "tailwindcss"`, z. B. efa-chat) tragen den
-Pfad stattdessen per `@source "../node_modules/@efa-one/sdk/frontend/**/*.js";`
-in die CSS-Einstiegsdatei ein. Die automatische Quellen-Erkennung von v4
-überspringt `node_modules`.
+Bestands-Apps auf Tailwind v3 tragen den Pfad stattdessen in `content` der
+`tailwind.config.js` ein (`'./node_modules/@efa-one/sdk/frontend/**/*.js'`).
 
 | Component | When to use |
 |---|---|
@@ -760,10 +779,13 @@ nachdem mehrere Apps inkonsistente Listen produziert haben.
    - Spalte ausblenden
 4. **Zahnrad oben rechts:** `Settings`-Icon öffnet ein Popover mit dem
    **Spalten-Inventar** — alle Spalten inkl. ausgeblendeter, als
-   Checkboxes umschaltbar; Reihenfolge zunächst per Up/Down-Icons
-   (Drag-Reorder optional, Phase 2).
+   Checkboxes umschaltbar; Reihenfolge per Up/Down-Icons. Zusätzlich (ab
+   SDK 1.20.0) in der Kopfzeile: Spalte am Griff (rechts in der Zelle, bei
+   Hover) per Drag & Drop verschieben, Breite an der rechten Kante ziehen
+   (Doppelklick bzw. „Standardbreite" im Spaltenmenü = zurück zum Code-Default,
+   Pfeiltasten auf der fokussierten Kante).
 5. **Benutzer-persistierte Ansicht:** Spalten-Sichtbarkeit, -Reihenfolge,
-   aktive Sortierung und aktive Filter werden **pro Liste pro User**
+   -Breiten, aktive Sortierung und aktive Filter werden **pro Liste pro User**
    persistiert. Persistenz **App-lokal in der App-DB** über die Tabelle
    `{app}_view_preferences` und den injizierten `persistence`-Adapter der
    `DataTable` (`createViewPreferencesClient` aus
@@ -785,6 +807,15 @@ nachdem mehrere Apps inkonsistente Listen produziert haben.
    Der Hook ist zusätzlich als `useIsMobile` aus `@efa-one/sdk/frontend/ui`
    exportiert; App-lokale Kopien davon sind abzulösen, damit die Schwelle
    plattformweit an einer Stelle steht.
+
+**Datumsspalten (ab SDK 1.20.0):** `type: 'date'` (→ `07.10.2026`) bzw.
+`type: 'datetime'` (→ `07.10.2026, 16:30`) an der `ColumnDef` setzen und im
+`accessor` den Rohwert (ISO-String, Epoch-ms, `Date`) liefern — **keinen** `cell`-
+Renderer mit `toLocaleDateString` (der liefert `7.10.2026`). Die Tabelle formatiert
+dann selbst, sortiert chronologisch, gruppiert nach Tag, und der Textfilter trifft
+die angezeigte Schreibweise. Wer trotzdem einen eigenen `cell` braucht (z. B. für
+Styling), formatiert darin über `formatDate`/`formatDateTime` aus
+`@efa-one/sdk/frontend/format` und setzt `type` trotzdem — für Sortierung und Filter.
 
 **Pflichtfeld pro Liste:** stabile `list_id` (z. B. `'invoices.list'`,
 `'users.list'`) als Schlüssel für `view_preferences`. Niemals zufällige
@@ -888,14 +919,17 @@ Drei Identifier kommen vor, die unterschiedliche Regeln haben:
 
 | Identifier | Wo | Erlaubt | Beispiel |
 |---|---|---|---|
-| GitHub-Repo-Name | github.com | Hyphens ok (GitHub-Standard) | `converge-foo-bar` |
-| `service_key` / `SERVICE_KEY` (App-Identität in efa-one) | `x-converge`-Block, App-`.env`, Tile | nur `[a-z][a-z0-9_]{1,63}` — **keine Hyphens** | `converge_foo_bar` |
-| GHCR-Image-Basename | `ghcr.io/<org>/<basename>-{backend,frontend}` | identisch zu `service_key` | `converge_foo_bar-backend` |
+| GitHub-Repo-Name | github.com | Hyphens ok (GitHub-Standard) | `efa-foo-bar` |
+| `service_key` / `SERVICE_KEY` (App-Identität in efa-one) | `x-converge`-Block, App-`.env`, Tile | nur `[a-z][a-z0-9_]{1,63}` — **keine Hyphens** | `efa_foo_bar` |
+| GHCR-Image-Basename | `ghcr.io/<org>/<basename>-{backend,frontend}` | identisch zu `service_key` | `efa_foo_bar-backend` |
 
-Der mitgelieferte Workflow `.github/workflows/docker-image.yml` normalisiert den
-GitHub-Repo-Namen automatisch (Hyphens → Underscores), bevor er ihn als
-Image-Namen verwendet. Der Compute-Step macht das transparent — der Repo darf
-weiterhin der GitHub-Konvention folgen.
+Der (optionale) mitgelieferte Workflow `.github/workflows/docker-image.yml` normalisiert
+den GitHub-Repo-Namen automatisch (Hyphens → Underscores), bevor er ihn als
+Image-Namen verwendet — der Repo darf weiterhin der GitHub-Konvention folgen. Wer
+selbst baut, wählt den Image-Namen direkt in Underscore-Form.
+
+Bestands-Apps von efa one tragen noch das `converge_`-Präfix (z. B. `converge_chat`); neue
+Apps nicht.
 
 **Wichtig:** `SERVICE_KEY` in der App-`.env`, der `service_key` im
 `x-converge`-Block der OpenAPI-Spec und der GHCR-Image-Basename müssen
@@ -918,7 +952,7 @@ gegen `/^[a-z][a-z0-9_]{1,63}$/` — Hyphens werden mit `HTTP 500` abgelehnt.
 - Backend Dockerfile: `rootDir: ".."` in tsconfig means tsc output lands in `dist/backend/src/` (not `dist/src/`). CMD and asset copy paths must use `dist/backend/src/`
 - Frontend Dockerfile: uses `npx vite build` directly (not `npm run build`) to skip a redundant `tsc` type-check in the image — Vite bundles the SDK's ESM output from `node_modules` directly
 - `.dockerignore` excludes `node_modules`, `dist`, `.env`, `.git` — prevents host `node_modules` from overwriting Docker `npm ci` results
-- **`IMAGE_REPOSITORY` (App-`.env`) steuert den GHCR-Pull-Pfad.** Form: `ghcr.io/<owner>/<repo-name>` ohne `-backend`/`-frontend`-Suffix und ohne `:tag`. Entspricht 1:1 dem CI-Output `ghcr.io/${{ github.repository }}` aus `.github/workflows/docker-image.yml`. **Pflicht vor dem ersten Tag-Push** — die Org gehört in den seltensten Fällen `d-w-it-consulting`, meist dem Partner/Kunden. `SERVICE_KEY` (App-Identität in efa-one) und `IMAGE_REPOSITORY` (GH-Repo-Pfad) sind bewusst entkoppelt: ein Kunden-Repo darf `imh_rw5` heißen, während die App in efa-one unter `converge_rw5` läuft.
+- **`IMAGE_REPOSITORY` (App-`.env`) steuert den Pull-Pfad.** Form: `<registry>/<owner>/<name>` ohne `-backend`/`-frontend`-Suffix und ohne `:tag` (mit dem mitgelieferten Workflow: `ghcr.io/<github-org lowercase>/<repo-name in Underscore-Form>`). Vor dem ersten Build auf die eigene Org setzen — der Default `ghcr.io/your-org/…` ist nur ein Platzhalter. `SERVICE_KEY` (App-Identität in efa-one) und `IMAGE_REPOSITORY` sind entkoppelt: ein Repo darf `imh_rw5` heißen, während die App in efa-one unter `efa_rw5` läuft — dann beim Deploy den `serviceKey` mitgeben.
 
 ## Architecture overview
 
@@ -937,12 +971,16 @@ A cross-app implementation is only done when all points below are true:
 
 ## Berechtigungsobjekte
 
-Jede App erhält beim Anlegen der Kachel in efa-one automatisch zwei Standard-Berechtigungsobjekte:
+Der Kernel legt beim Anlegen der Kachel automatisch **genau ein** Berechtigungsobjekt an:
 
 - `{app_key}.default` – Zugriff (Kachel sichtbar, App nutzbar)
-- `{app_key}.admin` – Admin-Zugriff (nur für interne/network Apps, nicht für externe Weblinks)
 
-Weitere granulare Berechtigungsobjekte können in efa-one angelegt werden, z. B. `{app_key}.can-export`.
+Ein `{app_key}.admin` erzeugt der Kernel **nicht**. Alles darüber hinaus — auch ein
+`{app_key}.admin`, falls die App eine Admin-Ebene braucht — registriert die App selbst über
+`registerPermissions()` beim Start (siehe unten). `x-converge.default_permissions` in der
+OpenAPI-Spec legt nichts an, sondern ist rein informativ.
+
+Weitere granulare Berechtigungsobjekte, z. B. `{app_key}.can-export`, meldet die App ebenfalls über `registerPermissions()`.
 Key-Schema: `{app-slug}.{permission}` – Wahl des Suffix ist frei.
 
 ### Dynamische Permission-Registrierung
@@ -966,7 +1004,8 @@ await registerPermissions('myapp', [
 **Verhalten:**
 - Neue Permissions werden angelegt, bestehende aktualisiert
 - Von der App nicht mehr gemeldete Custom-Permissions werden automatisch entfernt
-- Die built-in `.default` / `.admin` Objekte bleiben immer erhalten
+- Das built-in `.default`-Objekt bleibt immer erhalten — **jeder andere** Key, den die App nicht
+  (mehr) meldet, wird entfernt. Ein `.admin` überlebt also nur, wenn die App ihn selbst registriert.
 - Fehlgeschlagene Registrierung wird geloggt, blockiert aber nicht den App-Start (fire-and-forget mit Retry)
 
 ### Custom Permission Objects (User-erzeugt, zur Laufzeit)
@@ -1073,6 +1112,8 @@ import { requireAdminOrPermission, requirePermission, requireAdmin } from '../mi
 // Standard: Admin (converge-admin) ODER eine der angegebenen App-Permissions:
 router.delete('/:id', requireAdminOrPermission('myapp.admin'), handler);
 router.get('/items', requireAdminOrPermission('myapp.read', 'myapp.admin'), handler);
+// myapp.read / myapp.admin existieren nur, wenn die App sie per registerPermissions() meldet —
+// sonst kommt hier ausschließlich converge-admin durch.
 
 // Reine App-Permission (ohne Admin-Bypass, selten):
 router.get('/export', requirePermission('myapp.can-export'), handler);
@@ -1090,7 +1131,7 @@ JWT-Caching.
 | Situation | Ergebnis |
 |---|---|
 | User hat Rolle mit `app.default` | Kachel sichtbar, `app.default` ist im Live-Lookup-Result |
-| User hat Rollen mit `app.default` + `app.admin` | Beide Keys werden zurückgegeben |
+| User hat Rollen mit `app.default` + `app.admin` (von der App registriert) | Beide Keys werden zurückgegeben |
 | User hat keine Rolle mit `app.*` | Kachel unsichtbar |
 | User hat Permission `converge-admin` | Sieht alle Kacheln; alle `requireAdminOrPermission` lassen ihn durch |
 | Kachel hat kein Berechtigungsobjekt (Altdaten) | Nur für Inhaber von `converge-admin` sichtbar |
@@ -1162,7 +1203,7 @@ useEffect(() => registerAppInfo({
 - `frontend/vite.config.ts` injiziert `__APP_VERSION__` aus `process.env.APP_VERSION` (Fallback: Git-Tag bzw. `dev`/`unknown`).
 - `frontend/Dockerfile`: `ARG APP_VERSION=dev` + `ENV APP_VERSION=$APP_VERSION` vor dem Vite-Build.
 - `docker-compose.yml` (frontend-Service): `build.args: { APP_VERSION: ${APP_VERSION:-dev} }`.
-- CI/CD reicht den GHCR-Image-Tag als `APP_VERSION` durch.
+- Der Build (mitgelieferter Workflow oder eigener) reicht den Image-Tag als `APP_VERSION` durch.
 - `frontend/src/vite-env.d.ts`: `declare const __APP_VERSION__: string;`.
 
 Ohne `registerAppInfo`-Aufruf zeigt das Kernel-Icon weiterhin „efa-one" + Kernel-Version (kein Fehler, nur kein App-spezifischer Inhalt).
@@ -1200,7 +1241,7 @@ Damit das funktioniert, **muss** jede Template-App `/api/openapi.json` anbieten.
 | `display_name` | ja | Im Dashboard sichtbarer Titel der Kachel. |
 | `suggested_icon` | nein | Lucide-Icon-Name. Fallback: `Package`. Admin kann beim Installieren überschreiben. |
 | `default_app_type` | nein | `internal` (iframe, Default), `network` (neuer Tab, gleiche Infra), `external` (externes Weblink). |
-| `default_permissions` | nein | Liste von Permission-Objekten, die beim Install zusätzlich zu `.default` / `.admin` angelegt werden. |
+| `default_permissions` | nein | Rein informativ: Liste der Permission-Objekte, die die App über `registerPermissions()` meldet. Der Kernel gibt sie beim Install nur im Response zurück und legt **nichts** an — angelegt wird beim App-Start über `registerPermissions()`. Synchron zu `backend/src/index.ts` halten. |
 
 ### Spec aktuell halten
 

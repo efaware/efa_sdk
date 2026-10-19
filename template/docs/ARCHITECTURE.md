@@ -150,7 +150,7 @@ efa-one JWT ── identity only ──► /api/auth/exchange
 
 - The JWT payload is exactly `{ sub, name, email, language, tenant, iat, exp, forcePasswordChange? }`. There is **no** `roles`, **no** `permissions`, **no** `role` field. Apps that look for those fields are reading a model that no longer exists.
 - `converge-admin` is a permission key like any other. There is no separate "admin role". The middleware `requireAdmin` is just sugar for "must have the `converge-admin` key in the live lookup".
-- Permission keys follow `{service_key}.{permission}`. Two are auto-created per tile: `.default` and `.admin` (external/weblink tiles only get `.default`). Apps register additional keys at startup via `registerPermissions()` from `@efa-one/sdk/backend/permissions.ts` — they appear immediately in the efa-one role management UI.
+- Permission keys follow `{service_key}.{permission}`. Only `.default` is auto-created per tile (tile visibility); the kernel does **not** create an `.admin`. Apps register every additional key — including an `.admin`, if they need one — at startup via `registerPermissions()` from `@efa-one/sdk/backend/permissions.ts`; they appear immediately in the efa-one role management UI.
 - No caching, no TTL. Permission changes take effect on the next request. The trade-off is one extra hop to `converge_access` per guarded route — acceptable for the responsiveness gain; see `@efa-one/sdk/backend/permissionClient.ts` header comment for the rationale.
 
 ### Backend usage (preferred)
@@ -165,7 +165,7 @@ import {
 
 router.get('/items',          requireAdminOrPermission('myapp.default', 'myapp.admin'), handler);
 router.post('/items',         requireAdminOrPermission('myapp.admin'), handler);
-router.delete('/items/:id',   requireAdminOrPermission('myapp.admin'), handler);
+router.delete('/items/:id',   requireAdminOrPermission('myapp.admin'), handler);   // myapp.admin must be registered via registerPermissions()
 router.get('/export',         requirePermission('myapp.can-export'), handler);   // intentionally excludes efa-one admins
 router.post('/system/reset',  requireAdmin, handler);
 ```

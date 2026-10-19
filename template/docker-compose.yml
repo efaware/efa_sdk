@@ -40,7 +40,7 @@ services:
       retries: 10
 
   backend:
-    image: ${IMAGE_REPOSITORY:-ghcr.io/d-w-it-consulting/template_app}-backend:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REPOSITORY:-ghcr.io/your-org/template_app}-backend:${IMAGE_TAG:-latest}
     build:
       context: .          # Repo root – backend/frontend package*.json + src
       dockerfile: backend/Dockerfile
@@ -67,7 +67,7 @@ services:
     expose:
       - "3001"            # Only expose within Docker networks, no host port mapping
     env_file:
-      - .env              # Alle Werte (Stack + App-spezifisch) in einer Datei. In Prod schreibt deploy.sh diese Datei beim Bootstrap/Update aus /opt/converge/.secrets.
+      - .env              # Alle Werte (Stack + App-spezifisch) in einer Datei. Auf der Instanz schreibt der Deployer diese Datei aus .env.example.
     environment:
       # Nur abgeleitete/zusammengesetzte Werte
       - PORT=3001
@@ -81,7 +81,7 @@ services:
       app-internal: {}
 
   frontend:
-    image: ${IMAGE_REPOSITORY:-ghcr.io/d-w-it-consulting/template_app}-frontend:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REPOSITORY:-ghcr.io/your-org/template_app}-frontend:${IMAGE_TAG:-latest}
     build:
       context: .          # Repo root – backend/frontend package*.json + src
       dockerfile: frontend/Dockerfile
