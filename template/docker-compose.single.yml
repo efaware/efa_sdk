@@ -20,7 +20,7 @@ volumes:
 services:
 
   backend:
-    image: ${IMAGE_REPOSITORY:-ghcr.io/d-w-it-consulting/template_app}-backend:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REPOSITORY:-ghcr.io/your-org/template_app}-backend:${IMAGE_TAG:-latest}
     build:
       context: .          # Repo root – backend/frontend package*.json + src
       dockerfile: Dockerfile.single
@@ -64,4 +64,4 @@ services:
     networks:
       converge-net:
         aliases:
-          - template-backend   # Beim Kopieren auf converge-{app}-backend ändern.
+          - template-backend   # Beim Kopieren auf einen eindeutigen Namen ändern, z. B. efa-myapp-backend.

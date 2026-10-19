@@ -49,8 +49,10 @@ npm --prefix frontend install
 
 Danach:
 
-1. In `backend/package.json` + `frontend/package.json` den Namen anpassen; in `docker-compose.yml`
-   den `SERVICE_KEY` (Underscore-Form, z. B. `efa_myapp`) und den Backend-Alias setzen.
+1. In `backend/package.json` + `frontend/package.json` den Namen anpassen. In `.env.example`
+   `SERVICE_KEY` (Underscore-Form, z. B. `efa_myapp`), `APP_NAME`, `APP_SESSION_COOKIE_NAME` und
+   `IMAGE_REPOSITORY` setzen; in `docker-compose.yml` (und `frontend/nginx.conf`) den Backend-Alias
+   `template-backend` durch einen eindeutigen Namen ersetzen, z. B. `efa-myapp-backend`.
 2. **Fachlicher Intake** (`docs/intake.md`) — die 9 Pflichtfragen + bedarfsweise 4 bedingte
    beantworten. Der vollständige Katalog steht in `CLAUDE.md` → „Fachliche Intake-Fragen";
    `docs/BUSINESS_PROMPT_TEMPLATE.md` ist die Copy/Paste-Eingabevorlage für Fachanwender.
@@ -64,14 +66,14 @@ Danach:
 ```bash
 # Tests (die Vorlage bringt eine laufende Suite mit — grün ab dem ersten Commit)
 npm --prefix backend  test              # schnell, alles gemockt
-npm --prefix backend  run test:coverage # dieselbe Suite + Coverage-Gate (so läuft die CI)
+npm --prefix backend  run test:coverage # dieselbe Suite + Coverage-Schwellen
 npm --prefix frontend test
 
 # Typecheck (Quellen UND Testcode — Vitest transpiliert ohne Typprüfung)
 npm --prefix backend run typecheck
 npm --prefix backend run typecheck:test
 
-# CI-Gates lokal spiegeln (npm audit + Copyleft-Lizenz-Check, optional Trivy)
+# Sicherheits-/Lizenz-Check (npm audit + Copyleft-Lizenz-Check, optional Trivy) — Empfehlung
 ./scripts/ci-local.sh
 
 # App als Container starten
@@ -83,9 +85,46 @@ die geteilten Bausteine (echte Temp-SQLite, Express-Test-App), `backend/src/__te
 die Fälle. Details und die Ratchet-Regel für die Coverage-Schwellen stehen in `CLAUDE.md`
 → „Tests: die mitgelieferte Basis erweitern, nicht ersetzen".
 
-> **Naming:** Der mitgelieferte CI-Workflow normalisiert deinen GitHub-Repo-Namen automatisch
-> zur Image-Convention (Hyphens → Underscores). `service_key` in der OpenAPI-Spec und `SERVICE_KEY`
-> in der App-`.env` müssen mit der Underscore-Form übereinstimmen — siehe `CLAUDE.md` → „Naming-Konventionen".
+## Ausliefern: Images bauen und in efa one installieren
+
+Damit efa one deine App installieren kann, braucht es **nur zwei Dinge**:
+
+1. **Container-Images in einer Registry**, auf die die efa-one-Instanz Lesezugriff hat —
+   `<IMAGE_REPOSITORY>-backend` (und beim Standard-Stack `<IMAGE_REPOSITORY>-frontend`), gebaut aus
+   den mitgelieferten Dockerfiles. Der Image-Basename entspricht dem `SERVICE_KEY` (Underscore-Form),
+   sonst beim Deploy den `serviceKey` mitgeben.
+2. **`docker-compose.yml` und `.env.example` im Backend-Image** — die mitgelieferten Dockerfiles
+   kopieren beide nach `/app/`, der Deployer liest daraus Stack und erwartete Einstellungen. Die
+   Compose nur so ändern, wie `CLAUDE.md` es beschreibt (Compose-Allowlist des Kernels).
+
+Installiert wird in efa one über die Kachel **Deployer**: unter *Registries* die Registry freigeben
+und einen Lesezugang hinterlegen, unter *Apps* Image-Pfad und Version eintragen. Kachel,
+Berechtigungen und Verbindungen legt efa one dabei selbst an; Updates laufen genauso mit neuer Version.
+
+**Wie du die Images baust, ist deine Sache.** Der einfachste Weg ist der mitgelieferte Workflow
+`.github/workflows/docker-image.yml` (bzw. `docker-image.single.yml`): er baut bei jedem `v*`-Tag
+(z. B. `v1.0.0`) und legt die Images unter `ghcr.io/<org>/<repo>` ab — den Repo-Namen wandelt er
+dabei in die Underscore-Form um. Genauso gut geht `docker build` + `docker push` von Hand oder deine
+eigene Pipeline.
+
+### Die übrigen Workflows in `.github/` sind optional
+
+Alles andere unter `.github/` ist der interne Qualitätsstandard von efa one für die eigenen Apps
+und für dich **eine Empfehlung, keine Voraussetzung**. efa one prüft beim Installieren nichts
+davon — behalten, anpassen oder löschen:
+
+| Datei | Was sie tut |
+|---|---|
+| `workflows/build-check.yml` | Typecheck, Tests, Lint, Build bei jedem Push/PR |
+| `workflows/security.yml` | `npm audit`, Lizenz-Allowlist, Trivy-Scan |
+| `workflows/image-scan.yml` | Signatur-Prüfung + Trivy auf dem fertigen Image |
+| `workflows/dependabot-automerge.yml` + `dependabot.yml` | automatische Dependency-Updates |
+
+Die **Cosign-Signatur** im Build-Workflow ist ebenfalls optional. Als „Zertifizierte App" zeigt
+efa one nur Images an, die efa one oder ein zertifizierter Partner signiert hat; ein selbst
+gebautes Image erscheint als „Unzertifizierte App" und lässt sich trotzdem installieren — außer
+die Instanz läuft im Strengmodus (`REQUIRE_IMAGE_SIGNATURE=true`), dann vorher mit dem Betreiber
+der Instanz klären.
 
 ## Berechtigungsobjekte
 
