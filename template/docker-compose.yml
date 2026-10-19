@@ -34,7 +34,7 @@ services:
     networks:
       - app-internal      # NEVER converge-net – database is never directly reachable from Converge
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${APP_DB_USER:-appuser}"]
+      test: ["CMD-SHELL", "pg_isready -U ${APP_DB_USER:-appuser} -d ${APP_DB_NAME:-appdb}"]
       interval: 5s
       timeout: 5s
       retries: 10
