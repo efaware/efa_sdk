@@ -29,3 +29,4 @@ export {
   type FilterDef,
   type DataTableSelectionProps,
 } from './DataTable.js';
+export { toCsv, toXlsx, downloadFile, type ExportCell, type ExportTable } from './tableExport.js';
