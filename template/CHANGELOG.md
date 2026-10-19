@@ -2,6 +2,12 @@
 
 All notable changes to this template will be documented here.
 
+## [1.15.0] - 2026-10-19
+
+### Added
+
+- **Intake-Frage 0 „Werkzeug oder Verwaltung?“** — kommt vor allen anderen Fragen und muss vom User ausdrücklich beantwortet werden. Hintergrund: Nicht-Entwickler beschreiben, was eine App *tun* soll, fast nie, was sie sich *merken* soll; Claude baute dann Formulare ohne Übersicht und ohne Speicherung, auch dort, wo später nachvollzogen werden muss, was passiert ist (z. B. im ERP angelegte Aufgaben). `CLAUDE.md` erklärt die drei Grundformen (Werkzeug / Verwaltung / Werkzeug mit Verlauf) in Alltagssprache, nennt Warnzeichen, wann ein Werkzeug nicht reicht, und legt fest, was pro Antwort gebaut wird. `docs/intake.md` und `docs/BUSINESS_PROMPT_TEMPLATE.md` haben den passenden Abschnitt.
+
 ## [1.14.0] - 2026-10-19
 
 ### Changed
