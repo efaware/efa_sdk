@@ -2,6 +2,19 @@
 
 All notable changes to this template will be documented here.
 
+## [1.14.0] - 2026-10-19
+
+### Changed
+
+- **CI/CD ist für App-Bauer optional, nicht Pflicht.** README und `CLAUDE.md` erklären jetzt, dass efa one zum Installieren nur Container-Images in einer lesbaren Registry braucht. Der Build-Workflow `docker-image.yml` ist der einfachste Weg dorthin; `build-check.yml`, `security.yml`, `image-scan.yml`, Dependabot und Auto-merge sind der interne efa-one-Standard und für alle anderen eine Empfehlung. Neue Regel in `CLAUDE.md`: Agenten richten keine CI/CD ein, solange der User nicht ausdrücklich danach fragt.
+- **README: neuer Abschnitt „Ausliefern"** — Images bauen, Installation über die Deployer-Kachel, Cosign-Signatur nur für die Kennzeichnung „Zertifizierte App" nötig.
+
+### Fixed
+
+- **`.env.example` beschrieb das abgeschaffte Shared-Secret-Modell.** `REGISTRY_API_KEY` durch die per-App-Identität `SERVICE_AUTH_KEY` ersetzt (die das SDK seit 2026-08 ausschließlich liest); Verweise auf `system/converge-kernel/scripts/deploy.sh` und `generate-jwt-keys.sh` entfernt, beides existiert nicht mehr — die Werte schreibt der Deployer. Hinweis auf den `# @pflicht`-Marker ergänzt.
+- **Image-Default zeigte auf `ghcr.io/d-w-it-consulting/template_app`.** Jetzt neutraler Platzhalter `ghcr.io/your-org/template_app` in `.env.example` und beiden Compose-Dateien.
+- **Naming-Beispiele mit `converge_`-Präfix** auf `efa_` umgestellt; `converge_` tragen nur noch Bestands-Apps.
+
 ## [1.5.0] - 2026-05-12
 
 ### Fixed
