@@ -111,12 +111,12 @@
     "@radix-ui/react-tooltip": "^1.1.6",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.6",
-    "@types/node": "^20.14.0",
+    "@types/node": "^22.20.5",
     "@types/pg": "^8.11.0",
     "@types/react": "^18.2.46",
     "@types/react-dom": "^18.2.0",
     "@types/supertest": "^7.2.0",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.5",
     "cookie-parser": "^1.4.6",
     "eslint": "^10.9.1",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -132,7 +132,7 @@
     "supertest": "^7.2.2",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.67.0",
-    "vitest": "^4.1.4"
+    "vitest": "^5.0.5"
   },
   "engines": {
     "node": ">=20"
