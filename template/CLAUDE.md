@@ -1,6 +1,6 @@
 # efa-one App Template
 
-efa-app-template-version: 1.13.1
+efa-app-template-version: 1.14.0
 
 ## What this is
 
@@ -54,9 +54,9 @@ prüfen. Vor jedem `npm install <paket>` bzw. `apk add`:
    Ist es ein natives Modul? Dann bewusst entscheiden + isolieren.
 
 Keine `DEPENDENCIES.md` pflegen — der Dependency-Nachweis lebt in `package-lock.json`
-+ `npm audit`. CVEs und Lizenzen prüft die CI automatisch (Dependabot, Trivy,
-`license-checker` — Copyleft GPL/AGPL/LGPL failt den Build). Der einzige manuelle
-Schritt ist die Notwendigkeitsfrage (Punkt 1).
++ `npm audit`. Wer die mitgelieferten Workflows nutzt, bekommt CVE- und Lizenzprüfung
+automatisch (Dependabot, Trivy, `license-checker` — Copyleft GPL/AGPL/LGPL failt den Build);
+ohne sie deckt `scripts/ci-local.sh` dieselben Prüfungen lokal ab.
 
 #### `overrides` in `backend/package.json` — warum, und wann sie wieder weg darf
 
@@ -104,11 +104,28 @@ Failure policy:
 The Dockerfile sets `ENVIRONMENT=production`. The `/dev/token` route only registers
 when `ENVIRONMENT !== 'production'`. Never change this.
 
+### CI/CD ist nicht deine Aufgabe — außer der User verlangt es ausdrücklich
+Eine App braucht für efa one **keine CI/CD-Pipeline**. Die einzige Voraussetzung fürs
+Installieren: Container-Images aus den mitgelieferten Dockerfiles liegen in einer Registry,
+die die Instanz lesen darf (siehe README → „Ausliefern"). Wie die Images dorthin kommen
+(mitgelieferter `docker-image.yml`, eigene Pipeline oder `docker build` + `docker push`),
+entscheidet der Betreiber des Repos.
+
+Deshalb:
+- **Keine Workflows anlegen, erweitern oder „vervollständigen"**, keine Branch-Protection,
+  kein Dependabot, kein Auto-merge, keine Signatur-Einrichtung vorschlagen oder umsetzen,
+  solange der User nicht ausdrücklich danach fragt.
+- Die Dateien unter `.github/` sind der **interne Qualitätsstandard von efa one** für die
+  eigenen Apps und für alle anderen eine **Empfehlung**. Sie dürfen bleiben, angepasst oder
+  gelöscht werden — nichts davon prüft efa one beim Installieren.
+- Was zählt, ist lokal prüfbar: `npm test`, `npm run typecheck`, `docker compose up -d --build`;
+  `scripts/ci-local.sh` als empfohlener Sicherheits-/Lizenz-Check.
+
 ### Tests: die mitgelieferte Basis erweitern, nicht ersetzen
 
 Das Scaffold kommt mit einer **laufenden Testsuite** — `npm test` ist ab dem ersten
-Commit grün, es gibt kein `--passWithNoTests`. Verbindlicher Standard ist die
-`TESTING.md` des Meta-Repos; hier nur, was für diese App-Vorlage gilt:
+Commit grün, es gibt kein `--passWithNoTests`. (Für die efa-one-eigenen Apps gilt
+zusätzlich die interne `TESTING.md`; hier nur, was für diese App-Vorlage gilt.)
 
 | Ort | Inhalt |
 |---|---|
@@ -125,8 +142,8 @@ transpiliert und dabei **nicht** typprüft, gibt es dafür `tsconfig.test.json` 
 Zwei Kommandos:
 
 ```bash
-npm test              # schnell, alles gemockt — läuft im Stop-Hook und im PR-Gate
-npm run test:coverage # dieselbe Suite + Coverage-Gate (so läuft die CI)
+npm test              # schnell, alles gemockt
+npm run test:coverage # dieselbe Suite + Coverage-Schwellen
 ```
 
 **Coverage-Ratchet:** In `vitest.config.ts` steht ein globaler Floor plus Per-Datei-Gates
@@ -155,7 +172,7 @@ Wahl betrifft nur Container-Zuschnitt und Datenbank.
 | Compose | `docker-compose.yml` | `docker-compose.single.yml` |
 | Dockerfile(s) | `backend/Dockerfile` + `frontend/Dockerfile` | `Dockerfile.single` |
 | Schema | `backend/src/db/schema.sql` | `backend/src/db/schema.sqlite.sql` |
-| CI-Workflow | `.github/workflows/docker-image.yml` | `…/docker-image.single.yml` (umbenennen) |
+| Build-Workflow (optional) | `.github/workflows/docker-image.yml` | `…/docker-image.single.yml` (umbenennen) |
 | SPA-Auslieferung | Frontend-nginx | Backend via `express.static` (`SERVE_STATIC=true`) |
 
 **Wann welche Variante? (verbindliche Entscheidungsregel)**
@@ -192,8 +209,8 @@ Nimm **Standard-Stack + PostgreSQL**, wenn **eines** zutrifft:
 
 **Beim Umstieg auf den Single-Container-Stack** (oder beim Scaffolding einer Single-Container-App):
 - `docker-compose.single.yml` als `docker-compose.yml` verwenden, die 3-Container-Variante entfernen.
-- `.github/workflows/docker-image.single.yml` → `docker-image.yml` umbenennen, die alte löschen
-  (sonst doppelter Build beim Tag-Push).
+- Falls der mitgelieferte Build-Workflow genutzt wird: `.github/workflows/docker-image.single.yml`
+  → `docker-image.yml` umbenennen, die alte löschen (sonst doppelter Build beim Tag-Push).
 - `schema.sqlite.sql` pflegen (SQLite-Dialekt: TEXT-IDs, `CURRENT_TIMESTAMP`); `schema.sql`
   kann entfernt werden. Strukturierte Werte selbst als TEXT serialisieren (kein JSONB).
 
@@ -915,14 +932,17 @@ Drei Identifier kommen vor, die unterschiedliche Regeln haben:
 
 | Identifier | Wo | Erlaubt | Beispiel |
 |---|---|---|---|
-| GitHub-Repo-Name | github.com | Hyphens ok (GitHub-Standard) | `converge-foo-bar` |
-| `service_key` / `SERVICE_KEY` (App-Identität in efa-one) | `x-converge`-Block, App-`.env`, Tile | nur `[a-z][a-z0-9_]{1,63}` — **keine Hyphens** | `converge_foo_bar` |
-| GHCR-Image-Basename | `ghcr.io/<org>/<basename>-{backend,frontend}` | identisch zu `service_key` | `converge_foo_bar-backend` |
+| GitHub-Repo-Name | github.com | Hyphens ok (GitHub-Standard) | `efa-foo-bar` |
+| `service_key` / `SERVICE_KEY` (App-Identität in efa-one) | `x-converge`-Block, App-`.env`, Tile | nur `[a-z][a-z0-9_]{1,63}` — **keine Hyphens** | `efa_foo_bar` |
+| GHCR-Image-Basename | `ghcr.io/<org>/<basename>-{backend,frontend}` | identisch zu `service_key` | `efa_foo_bar-backend` |
 
-Der mitgelieferte Workflow `.github/workflows/docker-image.yml` normalisiert den
-GitHub-Repo-Namen automatisch (Hyphens → Underscores), bevor er ihn als
-Image-Namen verwendet. Der Compute-Step macht das transparent — der Repo darf
-weiterhin der GitHub-Konvention folgen.
+Der (optionale) mitgelieferte Workflow `.github/workflows/docker-image.yml` normalisiert
+den GitHub-Repo-Namen automatisch (Hyphens → Underscores), bevor er ihn als
+Image-Namen verwendet — der Repo darf weiterhin der GitHub-Konvention folgen. Wer
+selbst baut, wählt den Image-Namen direkt in Underscore-Form.
+
+Bestands-Apps von efa one tragen noch das `converge_`-Präfix (z. B. `converge_chat`); neue
+Apps nicht.
 
 **Wichtig:** `SERVICE_KEY` in der App-`.env`, der `service_key` im
 `x-converge`-Block der OpenAPI-Spec und der GHCR-Image-Basename müssen
@@ -945,7 +965,7 @@ gegen `/^[a-z][a-z0-9_]{1,63}$/` — Hyphens werden mit `HTTP 500` abgelehnt.
 - Backend Dockerfile: `rootDir: ".."` in tsconfig means tsc output lands in `dist/backend/src/` (not `dist/src/`). CMD and asset copy paths must use `dist/backend/src/`
 - Frontend Dockerfile: uses `npx vite build` directly (not `npm run build`) to skip a redundant `tsc` type-check in the image — Vite bundles the SDK's ESM output from `node_modules` directly
 - `.dockerignore` excludes `node_modules`, `dist`, `.env`, `.git` — prevents host `node_modules` from overwriting Docker `npm ci` results
-- **`IMAGE_REPOSITORY` (App-`.env`) steuert den GHCR-Pull-Pfad.** Form: `ghcr.io/<owner>/<repo-name>` ohne `-backend`/`-frontend`-Suffix und ohne `:tag`. Entspricht 1:1 dem CI-Output `ghcr.io/${{ github.repository }}` aus `.github/workflows/docker-image.yml`. **Pflicht vor dem ersten Tag-Push** — die Org gehört in den seltensten Fällen `d-w-it-consulting`, meist dem Partner/Kunden. `SERVICE_KEY` (App-Identität in efa-one) und `IMAGE_REPOSITORY` (GH-Repo-Pfad) sind bewusst entkoppelt: ein Kunden-Repo darf `imh_rw5` heißen, während die App in efa-one unter `converge_rw5` läuft.
+- **`IMAGE_REPOSITORY` (App-`.env`) steuert den Pull-Pfad.** Form: `<registry>/<owner>/<name>` ohne `-backend`/`-frontend`-Suffix und ohne `:tag` (mit dem mitgelieferten Workflow: `ghcr.io/<github-org lowercase>/<repo-name in Underscore-Form>`). Vor dem ersten Build auf die eigene Org setzen — der Default `ghcr.io/your-org/…` ist nur ein Platzhalter. `SERVICE_KEY` (App-Identität in efa-one) und `IMAGE_REPOSITORY` sind entkoppelt: ein Repo darf `imh_rw5` heißen, während die App in efa-one unter `efa_rw5` läuft — dann beim Deploy den `serviceKey` mitgeben.
 
 ## Architecture overview
 
@@ -1196,7 +1216,7 @@ useEffect(() => registerAppInfo({
 - `frontend/vite.config.ts` injiziert `__APP_VERSION__` aus `process.env.APP_VERSION` (Fallback: Git-Tag bzw. `dev`/`unknown`).
 - `frontend/Dockerfile`: `ARG APP_VERSION=dev` + `ENV APP_VERSION=$APP_VERSION` vor dem Vite-Build.
 - `docker-compose.yml` (frontend-Service): `build.args: { APP_VERSION: ${APP_VERSION:-dev} }`.
-- CI/CD reicht den GHCR-Image-Tag als `APP_VERSION` durch.
+- Der Build (mitgelieferter Workflow oder eigener) reicht den Image-Tag als `APP_VERSION` durch.
 - `frontend/src/vite-env.d.ts`: `declare const __APP_VERSION__: string;`.
 
 Ohne `registerAppInfo`-Aufruf zeigt das Kernel-Icon weiterhin „efa-one" + Kernel-Version (kein Fehler, nur kein App-spezifischer Inhalt).
