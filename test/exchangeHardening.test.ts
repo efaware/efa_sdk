@@ -5,6 +5,7 @@ import express from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const cookieParser = require('cookie-parser');
 import request from 'supertest';
+import { resetProvenanceReplayCache } from '../src/backend/serviceProvenance';
 import {
   classifyPlatformToken,
   checkSessionSecret,
@@ -35,7 +36,14 @@ beforeEach(() => {
   vi.stubEnv('NODE_ENV', 'production');
   vi.stubEnv('APP_SESSION_COOKIE_PATH', '');
   vi.stubEnv('APP_SESSION_SECRET_STRICT', '');
+  resetProvenanceReplayCache();
 });
+
+function provenance(sub = 'converge_kernel', aud = 'myapp'): string {
+  return jwt.sign({}, privateKey, {
+    algorithm: 'RS256', issuer: 'converge-gateway', audience: aud, subject: sub, expiresIn: 60, jwtid: crypto.randomUUID(),
+  });
+}
 
 function platformToken(claims: Record<string, unknown> = {}): string {
   return jwt.sign(
@@ -99,12 +107,32 @@ describe('classifyPlatformToken', () => {
 });
 
 describe('POST /exchange with the pre-filter', () => {
-  it('exchanges a login token and a gw: app token', async () => {
-    for (const claims of [{}, { gw: 'app' }]) {
-      const res = await request(app()).post('/api/auth/exchange').send({ token: platformToken(claims) });
-      expect(res.status).toBe(200);
-      expect(setCookies(res).some((c) => c.startsWith('myapp_app_session=ey'))).toBe(true);
-    }
+  it('exchanges a login token (browser path, no provenance needed)', async () => {
+    const res = await request(app()).post('/api/auth/exchange').send({ token: platformToken() });
+    expect(res.status).toBe(200);
+    expect(setCookies(res).some((c) => c.startsWith('myapp_app_session=ey'))).toBe(true);
+  });
+
+  it('exchanges a gw: app token only on the gateway call to THIS app (provenance sub=converge_kernel, aud=own key)', async () => {
+    const ok = await request(app()).post('/api/auth/exchange')
+      .set('X-Service-Token', provenance())
+      .send({ token: platformToken({ gw: 'app' }) });
+    expect(ok.status).toBe(200);
+  });
+
+  it.each([
+    ['without provenance (replayed by another app)', undefined],
+    ['with provenance for another app', () => provenance('converge_kernel', 'otherapp')],
+    ['with provenance from another caller', () => provenance('converge_chat')],
+  ])('rejects a gw: app token %s', async (_l, prov) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const r = request(app()).post('/api/auth/exchange');
+    if (prov) r.set('X-Service-Token', prov());
+    const res = await r.send({ token: platformToken({ gw: 'app' }) });
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('gateway_provenance_required');
+    expect(res.headers['set-cookie']).toBeUndefined();
+    warn.mockRestore();
   });
 
   it.each([

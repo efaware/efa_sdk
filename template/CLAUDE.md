@@ -277,8 +277,12 @@ und Gateway-Tausch-Tokens (`gw: 'app'`). Abgewiesen werden Tokens mit `purpose`
 (Delegation, RAG, Run-as) oder `serviceKey` (401 `delegation_token_not_accepted`),
 mit `gw` ungleich `'app'` (401), mit `forcePasswordChange: true`
 (403 `FORCE_PASSWORD_CHANGE`) und mit `tenant` ungleich `'default'`
-(403 `tenant_not_supported`). Ein eigener Vorfilter vor dem Exchange ist nicht mehr nötig.
-Die Prüfung steht als `classifyPlatformToken()` auch einzeln bereit.
+(403 `tenant_not_supported`). Das Gateway-Tausch-Token (`gw: 'app'`) gilt nur mit dem
+Provenance-Token, das der Gateway dem Tausch-Aufruf an genau diese App beilegt
+(`sub=converge_kernel`, `aud=SERVICE_KEY`); sonst 401 `gateway_provenance_required` — eine
+App, die so ein Token für sich bekommen hat, kann es nicht bei einer anderen eintauschen.
+Ein eigener Vorfilter vor dem Exchange ist nicht mehr nötig. Die Claim-Prüfung steht als
+`classifyPlatformToken()` auch einzeln bereit.
 
 **Cookie-Pfad (efa #286).** `app_session` liegt im gebauten Image (`NODE_ENV=production`)
 auf `/apps/<SERVICE_KEY>/` statt auf `/`; der Browser schickt es damit nur noch an diese
@@ -313,10 +317,9 @@ Startabbruch.
 **`serviceClient`** wiederholt 4xx nicht mehr (`ServiceClientError` mit `status`) und kennt
 `call(…, body, { timeoutMs })`. Permission-Lookups brechen nach 5 s ab (fail-closed, 503).
 
-**Rollout-Reihenfolge:** Kernel ab efa_kernel#106/#107 zuerst, dann der App-Bump. Mit
-einem älteren Kernel kommt der Gateway-Tausch noch mit dem Delegations-Token
-(`purpose=mcp-delegation`) an — der neue Vorfilter weist es ab, eingehende MCP-Werkzeuge
-der App schlagen dann fehl.
+**Rollout-Reihenfolge:** Kernel ab efa_kernel#106/#107 zuerst, dann der App-Bump. Ein
+Kernel vor v1.0.0-rc.1 (ohne efa #264) reichte beim Gateway-Tausch noch das
+Delegations-Token weiter; das lehnt schon SDK ≥ 1.17 ab (keine `jti`).
 
 ## Fachliche Intake-Fragen (Pflicht — verbindlich für Claude)
 

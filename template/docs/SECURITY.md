@@ -22,7 +22,7 @@ Never commit `.env` to version control.
 
 ## Token Exchange
 
-`POST /api/auth/exchange` accepts only login tokens and the gateway exchange token (`gw: 'app'`). Tokens with `purpose` or `serviceKey` (delegation, RAG, run-as), with any other `gw`, with `forcePasswordChange: true` or with a tenant other than `default` are rejected (`classifyPlatformToken`, since `@efa-one/sdk` 1.23).
+`POST /api/auth/exchange` accepts only login tokens and the gateway exchange token (`gw: 'app'`, only together with the gateway's provenance token for this app). Tokens with `purpose` or `serviceKey` (delegation, RAG, run-as), with any other `gw`, with `forcePasswordChange: true` or with a tenant other than `default` are rejected (`classifyPlatformToken`, since `@efa-one/sdk` 1.23).
 
 ## Service-to-Service
 

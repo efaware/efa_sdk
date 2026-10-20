@@ -249,9 +249,10 @@ Needs a kernel with efaware/efa_kernel#106 and #107 first (gateway exchange toke
 
 - `POST /api/auth/exchange` rejects tokens with `purpose` or `serviceKey` (delegation,
   RAG, run-as), with a `gw` other than `'app'`, with `forcePasswordChange: true` and with a
-  tenant other than `default` (`classifyPlatformToken`). Against an older kernel the
-  gateway still exchanges the delegation token itself, so incoming MCP tool calls to the
-  app would fail — kernel first.
+  tenant other than `default` (`classifyPlatformToken`). The gateway exchange token
+  (`gw: 'app'`) is accepted only together with the gateway's provenance token for this app
+  (`sub=converge_kernel`, `aud=SERVICE_KEY`), so an app that received one cannot replay it
+  at another app. Kernel first: before efaware/efa_kernel#106 tokens carry no `gw`.
 - `app_session` lives on `/apps/<SERVICE_KEY>/` instead of `/` when `NODE_ENV=production`
   (every app image sets it); `/` otherwise, `APP_SESSION_COOKIE_PATH` overrides (set it to
   `/` to run a built image locally without the gateway). With an app-specific cookie name

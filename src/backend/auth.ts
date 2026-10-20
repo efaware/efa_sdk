@@ -34,6 +34,12 @@ export interface JwtPayload {
   forcePasswordChange?: boolean;
   /** Token-ID. Jedes Kernel-Token trägt eine; Grundlage der Sitzungs-Entwertung. */
   jti?: string;
+  /**
+   * Vom Kernel-Gateway ausgestelltes Token (seit efa_kernel#106): `app` =
+   * Sitzungs-Tausch einer App, `kernel` = Bearer für kernel-native Ziele.
+   * Technische Markierung, keine Benutzerinfo.
+   */
+  gw?: string;
 }
 
 export interface SessionPayload {
@@ -533,6 +539,9 @@ export function requireInternalOrAdminOrPermission(...args: (string | Provenance
 /** Einzige Tenant-Kennung dieser Plattform (Multi-Tenancy bewusst nicht unterstützt). */
 const PLATFORM_TENANT = 'default';
 
+/** Aufrufer, als der der Kernel-Gateway den Sitzungs-Tausch ausführt (`exchangeForSession`). */
+const GATEWAY_EXCHANGE_CALLER = 'converge_kernel';
+
 /** Ergebnis der Claim-Prüfung eines eingereichten Plattform-Tokens. */
 export type PlatformTokenVerdict =
   /** Reguläres Login- bzw. Gateway-Tausch-Token — der Exchange darf übernehmen. */
@@ -559,7 +568,8 @@ export type PlatformTokenVerdict =
  *    stellt ein eigenes, zweckfreies aus; keine Tokenart mit `purpose` hat am
  *    Exchange noch etwas zu suchen. Es gibt deshalb keine Ausnahmeliste.
  *  - `gw` mit einem anderen Wert als `'app'`: `gw: 'app'` ist genau dieses
- *    Gateway-Tausch-Token (60 s, efa_kernel#106) und bleibt der normale Weg.
+ *    Gateway-Tausch-Token (60 s, efa_kernel#106) und bleibt der normale Weg —
+ *    der Exchange verlangt dafür zusätzlich das Provenance-Token des Gateways.
  *    `gw: 'kernel'` ist ein Bearer für kernel-native Ziele und erreicht eine App
  *    nie — taucht es hier auf, ist es abgegriffen.
  *  - `forcePasswordChange: true`: der Kernel sperrt solche Konten bis zum
@@ -651,6 +661,26 @@ export function createExchangeRouter(pool: Pool): Router {
       }));
       res.status(verdict.status).json({ error: verdict.error, code: verdict.code });
       return;
+    }
+
+    // Das Gateway-Tausch-Token (`gw: 'app'`) gilt nur auf dem Tausch-Aufruf des
+    // Gateways an DIESE App. Es trägt `aud: converge` wie jedes Plattform-Token und
+    // wäre sonst 60 s lang an jeder anderen App tauschbar — eine App, die es für
+    // sich bekommen hat, holte sich damit eine Sitzung bei einer anderen. Der
+    // Gateway legt dem Aufruf ein Provenance-Token bei (sub=converge_kernel,
+    // aud=Ziel-App, seit efa #264); das bindet den Tausch an den Gateway und an
+    // diese App. Tokens älterer Kernel ohne `gw` sind davon nicht betroffen.
+    if (convergePayload.gw === 'app') {
+      const provenance = verifyServiceProvenance(req, { allowedCallers: [GATEWAY_EXCHANGE_CALLER] });
+      if (!provenance.ok) {
+        console.warn(JSON.stringify({
+          level: 'warn',
+          msg: 'Token-Exchange abgelehnt: Gateway-Tausch-Token ohne Herkunftsnachweis',
+          reason: provenance.reason,
+        }));
+        res.status(401).json({ error: 'Gateway-Tausch-Token nur auf dem Tausch-Aufruf des Gateways', code: 'gateway_provenance_required' });
+        return;
+      }
     }
 
     // Bindung an die Kernel-Sitzung (efa-Task #137): jedes Kernel-Token trägt
