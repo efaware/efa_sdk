@@ -66,11 +66,7 @@ export function isFromPlatformParent(event: MessageEvent): boolean {
   // nur an die eigene Origin. Eine Nachricht von einer anderen Origin stammt also
   // nie vom Kernel — etwa wenn eine fremde Seite die App über einen direkt
   // erreichbaren App-Port einbettet, wo `frame-ancestors` des Gateways nicht greift.
-  try {
-    return event.origin === window.location.origin;
-  } catch {
-    return false;
-  }
+  return event.origin === window.location.origin;
 }
 
 export function sendAtStart(): void {

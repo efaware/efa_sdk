@@ -280,11 +280,13 @@ mit `gw` ungleich `'app'` (401), mit `forcePasswordChange: true`
 (403 `tenant_not_supported`). Ein eigener Vorfilter vor dem Exchange ist nicht mehr nötig.
 Die Prüfung steht als `classifyPlatformToken()` auch einzeln bereit.
 
-**Cookie-Pfad (efa #286).** `app_session` liegt auf `/apps/<SERVICE_KEY>/` statt auf `/`;
-der Browser schickt es damit nur noch an diese App. Bei `ENVIRONMENT=development` bleibt
-es auf `/` (lokal ohne Gateway), `APP_SESSION_COOKIE_PATH` überschreibt beides. Ein altes
-Cookie auf `/` löscht der Exchange, sobald der Browser es mitschickt; bis dahin gewinnt das
-neue (längerer Pfad, kommt zuerst). Für das Frontend ändert sich nichts, solange alle
+**Cookie-Pfad (efa #286).** `app_session` liegt im gebauten Image (`NODE_ENV=production`)
+auf `/apps/<SERVICE_KEY>/` statt auf `/`; der Browser schickt es damit nur noch an diese
+App. Bei `npm run dev` bleibt es auf `/` (lokal ohne Gateway), `APP_SESSION_COOKIE_PATH`
+überschreibt beides — `APP_SESSION_COOKIE_PATH=/`, wer das gebaute Image lokal über den
+Frontend-Port aufruft. Ein altes Cookie auf `/` löscht der Exchange, sobald der Browser es
+mitschickt (nur bei eigenem `APP_SESSION_COOKIE_NAME`; das generische `app_session` kann
+einer anderen App gehören); bis dahin gewinnt das neue (längerer Pfad, kommt zuerst). Für das Frontend ändert sich nichts, solange alle
 API-Aufrufe über den Gateway-Präfix laufen (`setApiBase('/apps/<key>')` in `useConvergeAuth`).
 
 **Service-Aufrufe eingrenzen (efa #287).** Der Aufrufer eines S2S-Requests steht nach
@@ -303,9 +305,10 @@ Provenance-Token ist höchstens 60 s alt und gilt je App genau einmal (`jti`); m
 Guards im selben Request sehen es trotzdem.
 
 **`APP_SESSION_SECRET` (efa #290)** braucht mindestens 32 Byte. Fehlt es oder ist es ein
-Platzhalter, startet die App nicht (`createExchangeRouter` wirft). Ein kürzerer Wert
-erzeugt eine Warnung, mit `APP_SESSION_SECRET_STRICT=true` (Template-Vorgabe) ebenfalls
-einen Startabbruch.
+Platzhalter, startet die App in Produktion nicht (`createExchangeRouter` wirft; außerhalb
+von Produktion nur ein Log, damit Tests den Router beim Import bauen können). Ein kürzerer
+Wert erzeugt eine Warnung, mit `APP_SESSION_SECRET_STRICT=true` (Template-Vorgabe) einen
+Startabbruch.
 
 **`serviceClient`** wiederholt 4xx nicht mehr (`ServiceClientError` mit `status`) und kennt
 `call(…, body, { timeoutMs })`. Permission-Lookups brechen nach 5 s ab (fail-closed, 503).

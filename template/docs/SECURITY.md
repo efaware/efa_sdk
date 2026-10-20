@@ -5,7 +5,7 @@
 | Variable | Purpose | Notes |
 |---|---|---|
 | `JWT_PUBLIC_KEY` | Validate incoming efa-one JWTs (RS256) | Base64-encoded RSA public key from efa-one |
-| `APP_SESSION_SECRET` | Sign app `app_session` cookies | At least 32 bytes. Generate: `openssl rand -hex 32`. Missing or placeholder → the app does not start; shorter → warning, or start abort with `APP_SESSION_SECRET_STRICT=true` (template default) |
+| `APP_SESSION_SECRET` | Sign app `app_session` cookies | At least 32 bytes. Generate: `openssl rand -hex 32`. Missing or placeholder → the app does not start in production; shorter → warning, or start abort with `APP_SESSION_SECRET_STRICT=true` (template default) |
 | `APP_DB_PASSWORD` | PostgreSQL password | Use a strong random value |
 
 Never commit `.env` to version control.
@@ -16,7 +16,7 @@ Never commit `.env` to version control.
 - `httpOnly: true` – not accessible via JavaScript (XSS protection)
 - `sameSite: 'lax'` – allows cross-site top-level navigations, blocks CSRF from third-party sites
 - `secure: true` in production – HTTPS only (template `.env.example`: `COOKIE_SECURE=true`)
-- `path: /apps/<SERVICE_KEY>/` (since `@efa-one/sdk` 1.23) – the browser sends it only to this app, not to every app on the same origin. `/` with `ENVIRONMENT=development`; `APP_SESSION_COOKIE_PATH` overrides. The exchange deletes a legacy cookie on `/`.
+- `path: /apps/<SERVICE_KEY>/` in the built image (since `@efa-one/sdk` 1.23) – the browser sends it only to this app, not to every app on the same origin. `/` with `npm run dev`; `APP_SESSION_COOKIE_PATH` overrides. With an app-specific cookie name the exchange deletes a legacy cookie on `/`.
 - expiry = expiry of the exchanged efa-one token (since `@efa-one/sdk` 1.17.0; before: a flat 8 h from exchange)
 - bound to the efa-one session: the cookie carries `kernelJti`/`kernelIat`, and `requireAuth` checks the session live against the kernel (`GET /api/internal/sessions/:jti/status`, cached 30 s). Kernel logout, password change, lock and kernel restart end the app session within 30 s; a failed lookup answers 503 (fail-closed). Requires a kernel that has this endpoint.
 

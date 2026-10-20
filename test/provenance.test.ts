@@ -250,12 +250,28 @@ describe('requireInternalOrAuth', () => {
   });
 });
 
+describe('callerService after a rejected allowlist', () => {
+  it('is removed again when a later, stricter guard rejects the caller', () => {
+    const r = req(mint({ sub: 'customer_app' }));
+    requireRegistryKey(r, mockRes(), vi.fn());
+    expect(r.callerService).toBe('customer_app');
+    const res = mockRes();
+    requireInternalOrAuth({ allowedCallers: ['converge_chat'] })(r, res, vi.fn());
+    expect(r.callerService).toBeUndefined();
+    expect(res.status).toHaveBeenCalledWith(401); // Benutzer-Weg ohne Sitzung
+  });
+});
+
 describe('requireInternalOrAdminOrPermission', () => {
   it('lets an allowed service through without a permission lookup', () => {
     const next = vi.fn();
     requireInternalOrAdminOrPermission({ allowedCallers: ['converge_chat'] }, 'myapp.read')(req(mint()), mockRes(), next);
     expect(next).toHaveBeenCalledOnce();
     expect(getUserPermissionsMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses options anywhere but in first position', () => {
+    expect(() => requireInternalOrAdminOrPermission('myapp.read', { allowedCallers: ['converge_chat'] } as never)).toThrow(/erstes Argument/);
   });
 
   it('keeps the variadic form (permission keys only)', () => {

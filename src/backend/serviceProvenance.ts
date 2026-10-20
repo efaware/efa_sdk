@@ -72,10 +72,19 @@ export type ProvenanceResult =
   /** Gültig, aber der Aufrufer steht nicht in `allowedCallers`. */
   | { ok: false; reason: 'caller_not_allowed'; caller: string };
 
-function getPlatformPublicKey(): string {
+let decodedKey: { b64: string; pem: string } | null = null;
+
+/** `JWT_PUBLIC_KEY` (base64-PEM) dekodiert; gemerkt, solange sich die Env nicht ändert. */
+export function getPlatformPublicKey(): string {
   const s = process.env.JWT_PUBLIC_KEY;
   if (!s) throw new Error('JWT_PUBLIC_KEY environment variable is required');
-  return Buffer.from(s, 'base64').toString('utf8');
+  if (decodedKey?.b64 !== s) decodedKey = { b64: s, pem: Buffer.from(s, 'base64').toString('utf8') };
+  return decodedKey.pem;
+}
+
+/** `1`/`true`/`yes`/`on`, ohne Groß-/Kleinschreibung. */
+export function isTruthyEnv(value: string | undefined): boolean {
+  return !!value && ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
 }
 
 // ─── Replay-Schutz ───────────────────────────────────────────────────────────
@@ -92,9 +101,14 @@ function consumeJti(jti: string, expSec: number): boolean {
   // Abgelaufene Einträge höchstens alle 5 s räumen: die Prüfung liegt auf dem
   // Hot-Path jeder internen Route. Ein abgelaufener Eintrag schadet nicht, das
   // Token selbst ist dann ebenfalls abgelaufen.
+  // Alle Tokens haben dieselbe Laufzeit, die Map ist also nach Ablauf sortiert
+  // (Einfügereihenfolge): beim ersten noch gültigen Eintrag aufhören.
   if (now - lastSweep >= SWEEP_INTERVAL_MS) {
     lastSweep = now;
-    for (const [k, exp] of usedJtis) if (exp < now) usedJtis.delete(k);
+    for (const [k, exp] of usedJtis) {
+      if (exp >= now) break;
+      usedJtis.delete(k);
+    }
   }
   if (usedJtis.has(jti)) return false;
   while (usedJtis.size >= replayCacheMax) {
@@ -190,6 +204,8 @@ export function verifyServiceProvenance(req: Request, options: ProvenanceGuardOp
   const result = verifyToken(req);
   if (!result.ok) return result;
   if (options.allowedCallers && !options.allowedCallers.includes(result.caller)) {
+    // Ein früherer Guard ohne Liste kann es im selben Request schon gesetzt haben.
+    delete (req as Request & { callerService?: string }).callerService;
     return { ok: false, reason: 'caller_not_allowed', caller: result.caller };
   }
   // Erst nach der Allowlist: ein Handler darf `req.callerService` als „dieser

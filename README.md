@@ -252,19 +252,27 @@ Needs a kernel with efaware/efa_kernel#106 and #107 first (gateway exchange toke
   tenant other than `default` (`classifyPlatformToken`). Against an older kernel the
   gateway still exchanges the delegation token itself, so incoming MCP tool calls to the
   app would fail — kernel first.
-- `app_session` lives on `/apps/<SERVICE_KEY>/` instead of `/` (`/` with
-  `ENVIRONMENT=development`, `APP_SESSION_COOKIE_PATH` overrides). The exchange deletes
-  a legacy cookie on `/` when the browser sends one.
+- `app_session` lives on `/apps/<SERVICE_KEY>/` instead of `/` when `NODE_ENV=production`
+  (every app image sets it); `/` otherwise, `APP_SESSION_COOKIE_PATH` overrides (set it to
+  `/` to run a built image locally without the gateway). With an app-specific cookie name
+  the exchange deletes a legacy cookie on `/`; the generic `app_session` is left alone,
+  it may belong to another app.
 - `requireRegistryKey({ allowedCallers })`, `requireInternalOrAuth({ allowedCallers })`,
   `requireInternalOrAdminOrPermission({ allowedCallers }, ...keys)`; the plain forms keep
   working. `req.callerService` carries the verified caller. Provenance tokens older than
   60 s are rejected, each `jti` is accepted once per app (in-memory, bounded); tokens
   without `jti` (older kernel) still pass.
-- `APP_SESSION_SECRET`: missing or placeholder → `createExchangeRouter` throws at startup;
-  shorter than 32 bytes → warning (start abort with `APP_SESSION_SECRET_STRICT=true`).
+- `APP_SESSION_SECRET`: missing or placeholder → `createExchangeRouter` throws at startup
+  in production (outside production it logs, so test suites that build the router before
+  setting env keep working); shorter than 32 bytes → warning, start abort with
+  `APP_SESSION_SECRET_STRICT=true`.
+- `requireInternalOrAdminOrPermission` throws when an options object is not the first
+  argument (it would otherwise be ignored silently).
 - `serviceClient` no longer retries 4xx (`ServiceClientError` with `status`), new
   `call(…, body, { timeoutMs })`; permission lookups time out after 5 s.
-- `isFromPlatformParent` also checks `event.origin === window.location.origin`.
+- `isFromPlatformParent` also checks `event.origin === window.location.origin`. The kernel
+  embeds SDK apps same-origin under `/apps/<key>/`; an app embedded from a foreign origin
+  no longer accepts platform messages.
 
 ## License
 

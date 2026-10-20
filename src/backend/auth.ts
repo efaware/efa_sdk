@@ -6,6 +6,8 @@ import { getSessionStatus } from './sessionStatusClient';
 import { isPlatformAdmin, isPlatformAdminPermission } from './platformAdmin';
 import {
   assertProvenanceOptions,
+  getPlatformPublicKey,
+  isTruthyEnv,
   verifyServiceProvenance,
   SERVICE_KEY_RE,
   type ProvenanceGuardOptions,
@@ -74,12 +76,6 @@ export interface AuthRequest extends Request {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getPlatformPublicKey(): string {
-  const s = process.env.JWT_PUBLIC_KEY;
-  if (!s) throw new Error('JWT_PUBLIC_KEY environment variable is required');
-  return Buffer.from(s, 'base64').toString('utf8');
-}
-
 function getSessionSecret(): string {
   const s = process.env.APP_SESSION_SECRET;
   if (!s) throw new Error('APP_SESSION_SECRET environment variable is required');
@@ -96,10 +92,6 @@ export const APP_SESSION_SECRET_MIN_BYTES = 32;
 const SESSION_SECRET_PLACEHOLDER_PREFIXES = ['changeme', 'change-me', 'change_me', 'please_change', 'replace_me', 'your-'];
 const SESSION_SECRET_PLACEHOLDERS = new Set(['secret', 'password', 'test', 'dev', 'development', 'app_session_secret']);
 
-function isTruthyEnv(value: string | undefined): boolean {
-  return !!value && ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
-}
-
 export type SessionSecretVerdict =
   | { ok: true }
   | { ok: false; level: 'error' | 'warn'; reason: 'missing' | 'placeholder' | 'too_short'; message: string };
@@ -109,15 +101,16 @@ export type SessionSecretVerdict =
  *
  * Das Secret ist die einzige Schranke gegen gefälschte App-Sitzungen: der
  * Sitzungsstatus beim Kernel kennt nur `jti`s, die es gibt, und eine
- * erfundene `jti` gilt dort als aktiv. Deshalb:
+ * erfundene `jti` gilt dort als aktiv. Stufen:
  *
- *  - fehlt → Fehler (wie bisher, nur jetzt beim Start statt beim ersten Request),
- *  - bekannter Platzhalter → Fehler; eine efaTech-Instanz hat nie einen, der
- *    Deployer erzeugt das Secret selbst (`randomSecret(32)`),
- *  - kürzer als 32 Byte → **Warnung** ab Werk, Fehler mit
- *    `APP_SESSION_SECRET_STRICT=true`. Bestandsinstanzen mit einem kurzen, aber
- *    geheimen Wert sollen durch ein SDK-Minor nicht ausfallen; das Template
- *    setzt den Schalter für neue Apps, ein späterer Major macht ihn zur Vorgabe.
+ *  - fehlt oder bekannter Platzhalter → `error`. Eine efaTech-Instanz hat nie
+ *    einen Platzhalter, der Deployer erzeugt das Secret selbst (`randomSecret(32)`).
+ *  - kürzer als 32 Byte → `warn`, mit `APP_SESSION_SECRET_STRICT=true` `error`.
+ *    Bestandsinstanzen mit kurzem, aber geheimem Wert sollen durch ein SDK-Minor
+ *    nicht ausfallen; das Template setzt den Schalter für neue Apps, ein späterer
+ *    Major macht ihn zur Vorgabe.
+ *
+ * Was ein `error` bewirkt, entscheidet `assertSessionSecret`.
  */
 export function checkSessionSecret(secret: string | undefined): SessionSecretVerdict {
   if (!secret) {
@@ -145,20 +138,31 @@ export function checkSessionSecret(secret: string | undefined): SessionSecretVer
 }
 
 /**
- * Bricht den Start ab, wenn `APP_SESSION_SECRET` fehlt, ein Platzhalter ist oder
- * (im Strengmodus) zu kurz ist; warnt sonst bei einem zu kurzen Wert.
- * `createExchangeRouter` ruft das beim Aufbau der Routen auf — jede App, die den
- * Exchange mountet, ist damit abgedeckt.
+ * Prüft `APP_SESSION_SECRET` beim Aufbau des Exchange-Routers (`createExchangeRouter`,
+ * jede App mountet ihn beim Start).
+ *
+ * Ein `error` bricht den Start **in Produktion** ab (`NODE_ENV=production`, das
+ * setzt jedes App-Image) — eine App mit fehlendem oder öffentlich bekanntem
+ * Secret startet dort nicht und nennt den Grund. Außerhalb von Produktion wird
+ * er nur geloggt: Test-Suites bauen den Router oft beim Import, bevor sie die
+ * Env setzen, und liefen bis 1.22 durch (fehlendes Secret fiel erst beim ersten
+ * Request auf, das bleibt so). `APP_SESSION_SECRET_STRICT=true` bricht bei
+ * jedem `error` ab, auch außerhalb von Produktion.
  */
 export function assertSessionSecret(): void {
   const verdict = checkSessionSecret(process.env.APP_SESSION_SECRET);
   if (verdict.ok) return;
-  if (verdict.level === 'error') throw new Error(verdict.message);
-  console.warn(JSON.stringify({ level: 'warn', msg: verdict.message, reason: verdict.reason }));
+  const fatal = verdict.level === 'error'
+    && (process.env.NODE_ENV === 'production' || isTruthyEnv(process.env.APP_SESSION_SECRET_STRICT));
+  if (fatal) throw new Error(verdict.message);
+  const level = verdict.level === 'error' ? 'error' : 'warn';
+  console[level](JSON.stringify({ level, msg: verdict.message, reason: verdict.reason }));
 }
 
+const DEFAULT_COOKIE_NAME = 'app_session';
+
 function getCookieName(): string {
-  return process.env.APP_SESSION_COOKIE_NAME || 'app_session';
+  return process.env.APP_SESSION_COOKIE_NAME || DEFAULT_COOKIE_NAME;
 }
 
 /**
@@ -171,10 +175,17 @@ function getCookieName(): string {
  * das Cookie deshalb auf dem eigenen Präfix:
  *
  *  1. `APP_SESSION_COOKIE_PATH`, wenn gesetzt (muss mit `/` beginnen),
- *  2. `/` bei `ENVIRONMENT=development` — lokaler Betrieb ohne Gateway
- *     (Vite-Proxy auf `/api`, `/dev/token`), dort gibt es kein Präfix,
- *  3. `/apps/<SERVICE_KEY>/`,
- *  4. `/`, wenn `SERVICE_KEY` fehlt oder kein gültiger Service-Key ist.
+ *  2. `/apps/<SERVICE_KEY>/` in Produktion (`NODE_ENV=production`, das setzt
+ *     jedes App-Image),
+ *  3. sonst `/` — lokale Entwicklung ohne Gateway (`npm run dev`, Vite-Proxy auf
+ *     `/api`, `/dev/token`), dort gibt es kein Präfix; ebenso ohne gültigen
+ *     `SERVICE_KEY`.
+ *
+ * Bewusst nicht an `ENVIRONMENT`: ältere `.env.example`-Fassungen trugen
+ * `ENVIRONMENT=development`, und solche Werte stehen auf Bestandsinstanzen noch
+ * in der App-`.env`. Wer das gebaute Image lokal ohne Gateway betreibt
+ * (`docker compose up` mit Aufruf über den Frontend-Port), setzt
+ * `APP_SESSION_COOKIE_PATH=/`.
  *
  * Die App-Backends selbst sehen den Präfix nicht (der Gateway schreibt ihn weg);
  * das ändert nichts, der Pfad wirkt nur im Browser. Der Gateway-Sitzungs-Tausch
@@ -183,7 +194,7 @@ function getCookieName(): string {
 export function getSessionCookiePath(): string {
   const explicit = process.env.APP_SESSION_COOKIE_PATH?.trim();
   if (explicit) return explicit;
-  if (process.env.ENVIRONMENT === 'development') return '/';
+  if (process.env.NODE_ENV !== 'production') return '/';
   const serviceKey = process.env.SERVICE_KEY;
   if (serviceKey && SERVICE_KEY_RE.test(serviceKey)) return `/apps/${serviceKey}/`;
   return '/';
@@ -202,7 +213,7 @@ function isSecureCookie(): boolean {
   // in Produktion an. Verhindert, dass der app_session-Cookie in Prod über HTTP
   // ausgeliefert wird, wenn COOKIE_SECURE vergessen wurde.
   return process.env.COOKIE_SECURE
-    ? ['1', 'true', 'yes', 'on'].includes(process.env.COOKIE_SECURE.toLowerCase())
+    ? isTruthyEnv(process.env.COOKIE_SECURE)
     : process.env.NODE_ENV === 'production';
 }
 
@@ -223,7 +234,8 @@ function setSessionCookie(res: Response, token: string, maxAgeMs: number): void 
  * Übergang `path=/` → `path=/apps/<key>/` (seit 1.23): ein vor dem Update
  * ausgestelltes Cookie liegt noch auf `/`. Es bliebe bis zu seinem Ablauf
  * (höchstens 8 h) neben dem neuen liegen und ginge weiter an jede App. Der
- * Exchange löscht es deshalb aktiv, sobald der Browser eins mitschickt.
+ * Exchange löscht es deshalb aktiv, sobald der Browser eins mitschickt — nur
+ * bei einem app-eigenen Cookie-Namen (siehe unten).
  *
  * Zwei gleichnamige Cookies stören die App in der Zwischenzeit nicht: der
  * Browser schickt das mit dem längeren Pfad zuerst (RFC 6265, 5.4), und
@@ -233,6 +245,10 @@ function setSessionCookie(res: Response, token: string, maxAgeMs: number): void 
  */
 function clearLegacySessionCookie(req: Request, res: Response): void {
   if (getSessionCookiePath() === '/') return;
+  // Nicht beim generischen Namen: `app_session` auf `/` kann einer anderen,
+  // noch nicht aktualisierten App gehören — sie verlöre bei jedem Tausch dieser
+  // App ihre Sitzung. Ein eigener Name (`<serviceKey>_app_session`) gehört nur ihr.
+  if (getCookieName() === DEFAULT_COOKIE_NAME) return;
   if (req.cookies?.[getCookieName()] === undefined) return;
   res.clearCookie(getCookieName(), { httpOnly: true, sameSite: 'lax', secure: isSecureCookie(), path: '/' });
 }
@@ -418,35 +434,6 @@ function registryKeyGuard(options: ProvenanceGuardOptions): Guard {
   };
 }
 
-/**
- * requireRegistryKey – Service-zu-Service-Auth.
- * Schützt /api/internal/*-Endpunkte. Nur Aufrufe mit gültigem
- * Gateway-Provenance-Token (`X-Service-Token`) für diesen Service passieren;
- * der Aufrufer steht danach in `req.callerService`.
- *
- * Zwei Formen:
- *   router.use(requireRegistryKey);                                   // jeder Service
- *   router.use(requireRegistryKey({ allowedCallers: ['converge_chat'] })); // nur diese
- *
- * Ein Aufrufer außerhalb von `allowedCallers` bekommt 403, ein fehlendes,
- * ungültiges, zu altes oder schon verwendetes Token 401.
- */
-export function requireRegistryKey(options: ProvenanceGuardOptions): Guard;
-export function requireRegistryKey(req: Request, res: Response, next: NextFunction): void;
-export function requireRegistryKey(
-  reqOrOptions: Request | ProvenanceGuardOptions,
-  res?: Response,
-  next?: NextFunction,
-): Guard | void {
-  if (isMiddlewareCall(res, next)) {
-    registryKeyGuard({})(reqOrOptions as AuthRequest, res, next as NextFunction);
-    return;
-  }
-  const options = (reqOrOptions ?? {}) as ProvenanceGuardOptions;
-  assertProvenanceOptions(options);
-  return registryKeyGuard(options);
-}
-
 function internalOrAuthGuard(options: ProvenanceGuardOptions): Guard {
   return (req, res, next) => {
     if (verifyServiceProvenance(req, options).ok) {
@@ -462,6 +449,44 @@ function internalOrAuthGuard(options: ProvenanceGuardOptions): Guard {
 }
 
 /**
+ * Beide Formen eines Guards: direkt als Middleware (`router.use(guard)`, Express
+ * ruft mit `(req, res, next)`) oder als Fabrik mit Optionen (`guard({ … })`).
+ */
+function dualGuard(
+  factory: (options: ProvenanceGuardOptions) => Guard,
+  a: unknown,
+  res?: Response,
+  next?: NextFunction,
+): Guard | void {
+  if (isMiddlewareCall(res, next)) {
+    factory({})(a as AuthRequest, res, next as NextFunction);
+    return;
+  }
+  const options = (a ?? {}) as ProvenanceGuardOptions;
+  assertProvenanceOptions(options);
+  return factory(options);
+}
+
+/**
+ * requireRegistryKey – Service-zu-Service-Auth.
+ * Schützt /api/internal/*-Endpunkte. Nur Aufrufe mit gültigem
+ * Gateway-Provenance-Token (`X-Service-Token`) für diesen Service passieren;
+ * der Aufrufer steht danach in `req.callerService`.
+ *
+ * Zwei Formen:
+ *   router.use(requireRegistryKey);                                   // jeder Service
+ *   router.use(requireRegistryKey({ allowedCallers: ['converge_chat'] })); // nur diese
+ *
+ * Ein Aufrufer außerhalb von `allowedCallers` bekommt 403, ein fehlendes,
+ * ungültiges, zu altes oder schon verwendetes Token 401.
+ */
+export function requireRegistryKey(options: ProvenanceGuardOptions): Guard;
+export function requireRegistryKey(req: Request, res: Response, next: NextFunction): void;
+export function requireRegistryKey(a: Request | ProvenanceGuardOptions, res?: Response, next?: NextFunction): Guard | void {
+  return dualGuard(registryKeyGuard, a, res, next);
+}
+
+/**
  * requireInternalOrAuth – akzeptiert ein gültiges Gateway-Provenance-Token
  * (Service-to-Service) ODER ein gültiges App-Session-JWT.
  *
@@ -470,18 +495,8 @@ function internalOrAuthGuard(options: ProvenanceGuardOptions): Guard {
  */
 export function requireInternalOrAuth(options: ProvenanceGuardOptions): Guard;
 export function requireInternalOrAuth(req: AuthRequest, res: Response, next: NextFunction): void;
-export function requireInternalOrAuth(
-  reqOrOptions: AuthRequest | ProvenanceGuardOptions,
-  res?: Response,
-  next?: NextFunction,
-): Guard | void {
-  if (isMiddlewareCall(res, next)) {
-    internalOrAuthGuard({})(reqOrOptions as AuthRequest, res, next as NextFunction);
-    return;
-  }
-  const options = (reqOrOptions ?? {}) as ProvenanceGuardOptions;
-  assertProvenanceOptions(options);
-  return internalOrAuthGuard(options);
+export function requireInternalOrAuth(a: AuthRequest | ProvenanceGuardOptions, res?: Response, next?: NextFunction): Guard | void {
+  return dualGuard(internalOrAuthGuard, a, res, next);
 }
 
 /**
@@ -495,8 +510,13 @@ export function requireInternalOrAuth(
 export function requireInternalOrAdminOrPermission(...permissionKeys: string[]): Guard;
 export function requireInternalOrAdminOrPermission(options: ProvenanceGuardOptions, ...permissionKeys: string[]): Guard;
 export function requireInternalOrAdminOrPermission(...args: (string | ProvenanceGuardOptions)[]): Guard {
-  const options: ProvenanceGuardOptions = typeof args[0] === 'object' && args[0] !== null ? args[0] : {};
-  const permissionKeys = args.filter((a): a is string => typeof a === 'string');
+  const [first, ...rest] = args;
+  const options: ProvenanceGuardOptions = typeof first === 'object' && first !== null ? first : {};
+  const keys = typeof first === 'string' ? args : rest;
+  if (!keys.every((a) => typeof a === 'string')) {
+    throw new Error('requireInternalOrAdminOrPermission: Optionen nur als erstes Argument, danach Permission-Keys');
+  }
+  const permissionKeys = keys as string[];
   assertProvenanceOptions(options);
   const userGuard = requireAdminOrPermission(...permissionKeys);
   return (req, res, next) => {
@@ -706,8 +726,11 @@ export function createExchangeRouter(pool: Pool): Router {
   router.post('/logout', (_req: Request, res: Response) => {
     const opts = { httpOnly: true, sameSite: 'lax' as const, secure: isSecureCookie() };
     res.clearCookie(getCookieName(), { ...opts, path: getSessionCookiePath() });
-    // Übergang: ein vor 1.23 ausgestelltes Cookie liegt auf `/`.
-    if (getSessionCookiePath() !== '/') res.clearCookie(getCookieName(), { ...opts, path: '/' });
+    // Übergang: ein vor 1.23 ausgestelltes Cookie liegt auf `/` (nicht beim
+    // generischen Namen, der kann einer anderen App gehören).
+    if (getSessionCookiePath() !== '/' && getCookieName() !== DEFAULT_COOKIE_NAME) {
+      res.clearCookie(getCookieName(), { ...opts, path: '/' });
+    }
     res.json({ ok: true });
   });
 

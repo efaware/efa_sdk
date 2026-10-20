@@ -32,7 +32,7 @@ beforeEach(() => {
   vi.stubEnv('APP_SESSION_SECRET', SECRET);
   vi.stubEnv('SERVICE_KEY', 'myapp');
   vi.stubEnv('APP_SESSION_COOKIE_NAME', 'myapp_app_session');
-  vi.stubEnv('ENVIRONMENT', 'production');
+  vi.stubEnv('NODE_ENV', 'production');
   vi.stubEnv('APP_SESSION_COOKIE_PATH', '');
   vi.stubEnv('APP_SESSION_SECRET_STRICT', '');
 });
@@ -138,14 +138,22 @@ describe('session cookie path', () => {
     expect(getSessionCookiePath()).toBe('/apps/myapp/');
   });
 
-  it('uses / in local development (no gateway prefix)', () => {
-    vi.stubEnv('ENVIRONMENT', 'development');
+  it('uses / outside production (npm run dev, no gateway prefix)', () => {
+    vi.stubEnv('NODE_ENV', 'development');
     expect(getSessionCookiePath()).toBe('/');
+    vi.stubEnv('NODE_ENV', '');
+    expect(getSessionCookiePath()).toBe('/');
+  });
+
+  it('ignores ENVIRONMENT=development (older .env.example values on deployed instances)', () => {
+    vi.stubEnv('ENVIRONMENT', 'development');
+    expect(getSessionCookiePath()).toBe('/apps/myapp/');
   });
 
   it('APP_SESSION_COOKIE_PATH wins', () => {
     vi.stubEnv('APP_SESSION_COOKIE_PATH', '/custom/');
-    vi.stubEnv('ENVIRONMENT', 'development');
+    expect(getSessionCookiePath()).toBe('/custom/');
+    vi.stubEnv('NODE_ENV', 'development');
     expect(getSessionCookiePath()).toBe('/custom/');
   });
 
@@ -188,8 +196,21 @@ describe('session cookie path', () => {
     expect(cookies.join(', ').split(';')[0]).toMatch(/^myapp_app_session=ey/);
   });
 
+  it('does not clear the generic app_session on / (may belong to another, older app)', async () => {
+    vi.stubEnv('APP_SESSION_COOKIE_NAME', '');
+    const res = await request(app())
+      .post('/api/auth/exchange')
+      .set('Cookie', 'app_session=other-apps-session')
+      .send({ token: platformToken() });
+    const cookies = setCookies(res);
+    expect(cookies).toHaveLength(1);
+    expect(cookies[0]).toMatch(/^app_session=ey.*Path=\/apps\/myapp\//);
+    const logout = await request(app()).post('/api/auth/logout');
+    expect(setCookies(logout)).toHaveLength(1);
+  });
+
   it('does not clear anything extra when the path is / (development)', async () => {
-    vi.stubEnv('ENVIRONMENT', 'development');
+    vi.stubEnv('NODE_ENV', 'development');
     const res = await request(app())
       .post('/api/auth/exchange')
       .set('Cookie', 'myapp_app_session=old')
@@ -244,9 +265,25 @@ describe('APP_SESSION_SECRET check', () => {
     expect(checkSessionSecret('ä'.repeat(16))).toEqual({ ok: true });
   });
 
-  it('createExchangeRouter fails fast on a missing secret and names the reason', () => {
+  it('createExchangeRouter fails fast in production on a missing secret and names the reason', () => {
     vi.stubEnv('APP_SESSION_SECRET', '');
     expect(() => createExchangeRouter({ query: vi.fn() } as never)).toThrow(/APP_SESSION_SECRET ist nicht gesetzt/);
+  });
+
+  it('outside production a missing secret only logs (tests build the router before setting env)', () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('APP_SESSION_SECRET', '');
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => createExchangeRouter({ query: vi.fn() } as never)).not.toThrow();
+    expect(String(err.mock.calls[0][0])).toContain('nicht gesetzt');
+    err.mockRestore();
+  });
+
+  it('APP_SESSION_SECRET_STRICT=true fails fast also outside production', () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('APP_SESSION_SECRET_STRICT', 'true');
+    vi.stubEnv('APP_SESSION_SECRET', 'short-but-random-x9');
+    expect(() => createExchangeRouter({ query: vi.fn() } as never)).toThrow(/mindestens 32/);
   });
 
   it('createExchangeRouter fails fast on a placeholder', () => {
