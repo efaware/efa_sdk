@@ -146,6 +146,27 @@ describe('verifyServiceProvenance', () => {
     warn.mockRestore();
   });
 
+  it('sweeps expired entries (in expiry order) on a later request', () => {
+    vi.useFakeTimers({ now: new Date('2026-10-21T10:00:00Z') });
+    try {
+      expect(verifyServiceProvenance(req(mint({ jti: 'old-1' }))).ok).toBe(true);
+      expect(verifyServiceProvenance(req(mint({ jti: 'old-2' }))).ok).toBe(true);
+      expect(provenanceReplayCacheSize()).toBe(2);
+      vi.setSystemTime(new Date('2026-10-21T10:02:00Z'));
+      expect(verifyServiceProvenance(req(mint({ jti: 'new-1' }))).ok).toBe(true);
+      expect(provenanceReplayCacheSize()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects a token with a malformed jti claim', () => {
+    const token = jwt.sign({ jti: 42 }, privateKey, {
+      algorithm: 'RS256', issuer: 'converge-gateway', audience: 'myapp', subject: 'converge_chat', expiresIn: 60,
+    });
+    expect(verifyServiceProvenance(req(token))).toEqual({ ok: false, reason: 'invalid' });
+  });
+
   it('default cap is 20 000 entries', () => {
     expect(PROVENANCE_REPLAY_CACHE_MAX).toBe(20_000);
   });
