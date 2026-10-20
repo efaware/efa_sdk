@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { Pool } from 'pg';
 import { getUserPermissions } from './permissionClient';
 import { getSessionStatus } from './sessionStatusClient';
+import { isPlatformAdmin, isPlatformAdminPermission } from './platformAdmin';
 
 // Plattformweite JWT-Claims (Finding #9). Muss identisch zum Kernel
 // (`backend/src/jwtClaims.ts`) sein — dort signiert, hier verifiziert. Bewusst
@@ -160,13 +161,14 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
 
 /**
  * requireAdmin – requireAuth + Live-Lookup gegen converge_access.
- * Erlaubt nur User mit Permission `converge-admin`.
+ * Erlaubt nur Plattform-Admins: Permission `efa-all` (bzw. im Übergang bis
+ * Q1-2027 der Alt-Key `converge-admin`, siehe `platformAdmin.ts`).
  */
 export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction): void {
   requireAuth(req, res, () => {
     getUserPermissions(req.user!.convergeId)
       .then((keys) => {
-        if (!keys.includes('converge-admin')) {
+        if (!isPlatformAdmin(keys)) {
           res.status(403).json({ error: 'Admin access required' });
           return;
         }
@@ -181,15 +183,24 @@ export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction
 
 /**
  * requirePermission – requireAuth + Live-Lookup gegen converge_access.
- * Erlaubt User mit dem angegebenen Permission-Key. converge-admin ist KEIN Bypass —
+ * Erlaubt User mit dem angegebenen Permission-Key. `efa-all` ist KEIN Bypass —
  * für Admin-Bypass siehe requireAdminOrPermission.
+ *
+ * Sonderfall: Wird ausdrücklich die oberste Berechtigung verlangt
+ * (`requirePermission('efa-all')` bzw. Alt-Aufrufe mit `'converge-admin'`),
+ * gelten beide Keys als gleichwertig — sonst bräche ein Aufruf je nach
+ * Kernel-Stand (vor/nach efa_kernel#98 bzw. nach dem Wegfall des Alias).
+ * TODO(Q1-2027): entfällt mit dem Alt-Key, siehe `platformAdmin.ts`.
  */
 export function requirePermission(permission: string) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     requireAuth(req, res, () => {
       getUserPermissions(req.user!.convergeId)
         .then((keys) => {
-          if (!keys.includes(permission)) {
+          const granted = isPlatformAdminPermission(permission)
+            ? isPlatformAdmin(keys)
+            : keys.includes(permission);
+          if (!granted) {
             res.status(403).json({ error: `Permission required: ${permission}` });
             return;
           }
@@ -204,7 +215,8 @@ export function requirePermission(permission: string) {
 }
 
 /**
- * requireAdminOrPermission – akzeptiert Converge-Admins (Permission `converge-admin`)
+ * requireAdminOrPermission – akzeptiert Plattform-Admins (Permission `efa-all`,
+ * im Übergang auch `converge-admin`, siehe `platformAdmin.ts`)
  * ODER User mit mindestens einem der angegebenen Permission-Keys.
  * Standard-Middleware für App-Routen — Admins kommen überall durch.
  */
@@ -213,7 +225,7 @@ export function requireAdminOrPermission(...permissionKeys: string[]) {
     requireAuth(req, res, () => {
       getUserPermissions(req.user!.convergeId)
         .then((keys) => {
-          if (keys.includes('converge-admin')) {
+          if (isPlatformAdmin(keys)) {
             next();
             return;
           }
@@ -285,7 +297,8 @@ export function requireInternalOrAuth(req: AuthRequest, res: Response, next: Nex
 
 /**
  * requireInternalOrAdminOrPermission – akzeptiert ein Gateway-Provenance-Token,
- * Converge-Admin oder eine der angegebenen App-Permissions. Live-Lookup für die
+ * einen Plattform-Admin (`efa-all`, im Übergang auch `converge-admin`) oder eine
+ * der angegebenen App-Permissions. Live-Lookup für die
  * User-Variante.
  */
 export function requireInternalOrAdminOrPermission(...permissionKeys: string[]) {

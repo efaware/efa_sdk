@@ -8,6 +8,10 @@ import SettingsPage from './pages/SettingsPage';
 import WidgetPage from './pages/WidgetPage';
 import { TooltipProvider } from '@efa-one/sdk/frontend/ui';
 
+// Top platform permission `efa-all` plus the legacy key `converge-admin`
+// (kernel alias, remove in Q1-2027). Mirrors PLATFORM_ADMIN_PERMISSIONS in the SDK.
+const PLATFORM_ADMIN_PERMISSIONS = ['efa-all', 'converge-admin'];
+
 // ─── Inner app (inside BrowserRouter, so useNavigate works) ──────────────────
 
 function InnerApp() {
@@ -25,9 +29,14 @@ function InnerApp() {
   useEffect(() => registerAppInfo({ appName: 'Template App', version: __APP_VERSION__ }), []);
 
   // Declare to Converge that this app has a settings page.
-  // Only sent once auth is ready and the user is an admin — non-admins should
-  // never see the settings gear icon in the Converge header.
-  const isAdmin = user?.permissions?.includes('converge-admin') ?? false;
+  // Only sent once auth is ready and the user is a platform admin — non-admins
+  // should never see the settings gear icon in the Converge header.
+  // Platform admin = permission `efa-all` (kernel v1.1.0+); during the transition
+  // until Q1-2027 the kernel also sends the legacy key `converge-admin`, and an
+  // older kernel sends only that one — so both count.
+  // TODO: once this scaffold depends on an @efa-one/sdk release that ships it,
+  // replace with `isPlatformAdmin(user?.permissions)` from '@efa-one/sdk/frontend'.
+  const isAdmin = user?.permissions?.some((k) => PLATFORM_ADMIN_PERMISSIONS.includes(k)) ?? false;
   useEffect(() => {
     if (isAdmin) {
       window.parent.postMessage({ type: 'CONVERGE_DECLARE_SETTINGS' }, getParentOrigin());

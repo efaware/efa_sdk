@@ -2,6 +2,12 @@
 
 All notable changes to this template will be documented here.
 
+## [Unreleased]
+
+### Changed
+
+- **Oberste Berechtigung heißt `efa-all` (vormals `converge-admin`, efa #343, efaware/efa_kernel#98).** `App.tsx` blendet das Einstellungs-Zahnrad und die Route `/settings` für Inhaber von `efa-all` **oder** dem Alt-Key `converge-admin` ein — der Kernel liefert Apps bis Q1-2027 beide, ein Kernel vor v1.1.0 nur den Alt-Key. `requireAdmin`/`requireAdminOrPermission` aus dem SDK akzeptieren beide Keys ebenfalls. `CLAUDE.md`, `docs/ARCHITECTURE.md` und `docs/SECURITY.md` beschreiben `efa-all` und empfehlen `isPlatformAdmin()` aus `@efa-one/sdk/backend` bzw. `/frontend` statt eines String-Vergleichs. Sobald das Scaffold auf eine SDK-Version mit `isPlatformAdmin` zeigt, ersetzt der Helper die lokale Liste in `App.tsx`.
+
 ## [1.15.0] - 2026-10-19
 
 ### Added

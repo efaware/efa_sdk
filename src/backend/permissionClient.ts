@@ -17,12 +17,15 @@
  *   architektonischen Vertrag zu brechen.
  *
  * Usage in middleware:
- *   import { getUserPermissions } from '../../template-core/permissionClient';
+ *   import { getUserPermissions, isPlatformAdmin } from '@efa-one/sdk/backend';
  *
  *   const keys = await getUserPermissions(req.user.convergeId);
- *   if (!keys.includes('myapp.admin') && !keys.includes('converge-admin')) {
+ *   if (!keys.includes('myapp.admin') && !isPlatformAdmin(keys)) {
  *     return res.status(403).json({ error: 'Forbidden' });
  *   }
+ *
+ * Nie direkt auf `'efa-all'`/`'converge-admin'` vergleichen — `isPlatformAdmin()`
+ * kennt beide Keys des Übergangs (bis Q1-2027).
  *
  * Fehlerverhalten: wirft bei Netzwerkfehler / non-2xx — Aufrufer reagieren fail-closed.
  * Konsequenz: converge_access-Ausfall sperrt jeden permission-geprüften Request
@@ -36,7 +39,8 @@ import { serviceClient } from './serviceClient';
  * Liefert alle effektiven Permission-Keys eines Users.
  *
  * @param convergeId  Die Converge-User-UUID (sub aus dem JWT)
- * @returns Array von Permission-Keys (z.B. ["myapp.default", "converge-admin"])
+ * @returns Array von Permission-Keys (z.B. ["myapp.default", "efa-all"]; ein
+ *          Kernel ab efa_kernel#98 liefert bis Q1-2027 zusätzlich "converge-admin")
  * @throws Error wenn der Lookup fehlschlägt
  */
 export async function getUserPermissions(convergeId: string): Promise<string[]> {
