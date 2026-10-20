@@ -53,6 +53,10 @@ npm install @efa-one/sdk react i18next i18next-http-backend react-i18next
 
 The runtime libraries are **optional peer dependencies** — install only the ones
 matching the entry point you use. The SDK itself does not bundle them.
+`i18next-http-backend` requires **4.0.2 or later**: older releases are covered by
+published security advisories (`npm audit` reports GHSA-xvq9-wjp8-hwqf for every
+version below 4.0.2). The range stays open upwards like the other peers, so a new
+major does not need an SDK release first.
 
 ## Usage
 
