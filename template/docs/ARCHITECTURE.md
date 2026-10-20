@@ -143,13 +143,13 @@ efa-one JWT ── identity only ──► /api/auth/exchange
                   converge_access  GET /api/internal/users/:id/permissions
                                       │
                                       ▼
-                       { keys: ["myapp.default", "converge-admin", ...] }
+                       { keys: ["myapp.default", "efa-all", ...] }
 ```
 
 **Key facts:**
 
 - The JWT payload is exactly `{ sub, name, email, language, tenant, iat, exp, forcePasswordChange? }`. There is **no** `roles`, **no** `permissions`, **no** `role` field. Apps that look for those fields are reading a model that no longer exists.
-- `converge-admin` is a permission key like any other. There is no separate "admin role". The middleware `requireAdmin` is just sugar for "must have the `converge-admin` key in the live lookup".
+- `efa-all` (formerly `converge-admin`) is the top platform permission and a key like any other. There is no separate "admin role". The middleware `requireAdmin` is just sugar for "must hold a platform-admin key in the live lookup" — `isPlatformAdmin()` from `@efa-one/sdk/backend` (or `/frontend`). Until Q1-2027 the kernel additionally returns the legacy key `converge-admin` (a kernel older than v1.1.0 returns only that one); `isPlatformAdmin()` accepts both, so never compare against either string yourself.
 - Permission keys follow `{service_key}.{permission}`. Only `.default` is auto-created per tile (tile visibility); the kernel does **not** create an `.admin`. Apps register every additional key — including an `.admin`, if they need one — at startup via `registerPermissions()` from `@efa-one/sdk/backend/permissions.ts`; they appear immediately in the efa-one role management UI.
 - No caching, no TTL. Permission changes take effect on the next request. The trade-off is one extra hop to `converge_access` per guarded route — acceptable for the responsiveness gain; see `@efa-one/sdk/backend/permissionClient.ts` header comment for the rationale.
 
@@ -158,9 +158,9 @@ efa-one JWT ── identity only ──► /api/auth/exchange
 ```ts
 import {
   requireAuth,                 // identity only
-  requireAdmin,                // requires 'converge-admin' (live lookup)
+  requireAdmin,                // requires 'efa-all' (live lookup; legacy 'converge-admin' until Q1-2027)
   requirePermission,           // exact key, no admin bypass (rare)
-  requireAdminOrPermission,    // 'converge-admin' OR any of the listed keys (default)
+  requireAdminOrPermission,    // 'efa-all' OR any of the listed keys (default)
 } from '../middleware/auth';
 
 router.get('/items',          requireAdminOrPermission('myapp.default', 'myapp.admin'), handler);
@@ -186,8 +186,10 @@ interface AppUser {
   // ...
 }
 
+import { isPlatformAdmin } from '@efa-one/sdk/frontend';
+
 const { user } = useConvergeAuth();
-const isAdmin   = user?.permissions?.includes('converge-admin') ?? false;
+const isAdmin   = isPlatformAdmin(user?.permissions);   // efa-all (+ legacy converge-admin)
 const canExport = user?.permissions?.includes('myapp.can-export') ?? false;
 ```
 

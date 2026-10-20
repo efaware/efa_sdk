@@ -238,7 +238,7 @@ describe('requireAuth', () => {
 // ─── requireAdmin ───────────────────────────────────────────────────────────
 
 describe('requireAdmin', () => {
-  it('returns 403 when user lacks converge-admin permission', async () => {
+  it('returns 403 when user lacks efa-all permission', async () => {
     getUserPermissionsMock.mockResolvedValueOnce(['myapp.default']);
     const req = sessionReq();
     const res = mockRes();
@@ -252,8 +252,14 @@ describe('requireAdmin', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('calls next when user has converge-admin permission', async () => {
-    getUserPermissionsMock.mockResolvedValueOnce(['converge-admin']);
+  // efa-all = oberste Berechtigung ab Kernel #98; converge-admin = Alt-Key
+  // (Kernel vor #98 bzw. Alias bis Q1-2027) — beide müssen durchkommen.
+  it.each([
+    [['efa-all']],
+    [['converge-admin']],
+    [['myapp.default', 'efa-all', 'converge-admin']],
+  ])('calls next for a platform admin (%j)', async (keys) => {
+    getUserPermissionsMock.mockResolvedValueOnce(keys);
     const req = sessionReq();
     const res = mockRes();
     const next = vi.fn();
@@ -263,6 +269,20 @@ describe('requireAdmin', () => {
     await flushAsync();
 
     expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('does not treat look-alike keys as platform admin', async () => {
+    getUserPermissionsMock.mockResolvedValueOnce(['efa-all.default', 'converge-admin-x', 'EFA-ALL']);
+    const res = mockRes();
+    const next = vi.fn();
+
+    requireAdmin(sessionReq(), res, next);
+    await flushAsync();
+    await flushAsync();
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
   });
 
   it('returns 401 for a revoked session without a permission lookup', async () => {
@@ -310,6 +330,51 @@ describe('requirePermission', () => {
     expect(next).toHaveBeenCalled();
   });
 
+  it('does not let efa-all bypass an app permission', async () => {
+    getUserPermissionsMock.mockResolvedValueOnce(['efa-all', 'converge-admin']);
+    const res = mockRes();
+    const next = vi.fn();
+
+    requirePermission('myapp.admin')(sessionReq(), res, next);
+    await flushAsync();
+    await flushAsync();
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  // Ausdrücklich verlangte oberste Berechtigung: beide Keys gleichwertig,
+  // egal welchen Key der Aufrufer nennt und welchen der Kernel liefert.
+  it.each([
+    ['efa-all', ['efa-all']],
+    ['efa-all', ['converge-admin']],
+    ['converge-admin', ['efa-all']],
+    ['converge-admin', ['converge-admin']],
+  ])('requirePermission(%s) accepts %j', async (required, keys) => {
+    getUserPermissionsMock.mockResolvedValueOnce(keys);
+    const res = mockRes();
+    const next = vi.fn();
+
+    requirePermission(required)(sessionReq(), res, next);
+    await flushAsync();
+    await flushAsync();
+
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('requirePermission(efa-all) rejects a non-admin', async () => {
+    getUserPermissionsMock.mockResolvedValueOnce(['myapp.admin']);
+    const res = mockRes();
+    const next = vi.fn();
+
+    requirePermission('efa-all')(sessionReq(), res, next);
+    await flushAsync();
+    await flushAsync();
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('returns 401 for a revoked session without a permission lookup', async () => {
     serviceCallMock.mockResolvedValue({ active: false, reason: 'session_revoked' });
     const res = mockRes();
@@ -329,8 +394,8 @@ describe('requirePermission', () => {
 // ─── requireAdminOrPermission ───────────────────────────────────────────────
 
 describe('requireAdminOrPermission', () => {
-  it('allows admin via converge-admin', async () => {
-    getUserPermissionsMock.mockResolvedValueOnce(['converge-admin']);
+  it.each(['efa-all', 'converge-admin'])('allows admin via %s', async (key) => {
+    getUserPermissionsMock.mockResolvedValueOnce([key]);
     const req = sessionReq();
     const res = mockRes();
     const next = vi.fn();
