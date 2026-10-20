@@ -27,13 +27,19 @@
  * Nie direkt auf `'efa-all'`/`'converge-admin'` vergleichen — `isPlatformAdmin()`
  * kennt beide Keys des Übergangs (bis Q1-2027).
  *
- * Fehlerverhalten: wirft bei Netzwerkfehler / non-2xx — Aufrufer reagieren fail-closed.
+ * Fehlerverhalten: wirft bei Netzwerkfehler / non-2xx / Timeout — Aufrufer reagieren fail-closed.
+ * Timeout: `PERMISSION_LOOKUP_TIMEOUT_MS` für den ganzen Lookup inkl. Wiederholungen
+ * (seit 1.23, efa #290). Vorher blockierte ein hängender Kernel jede
+ * permission-geprüfte Route unbegrenzt.
  * Konsequenz: converge_access-Ausfall sperrt jeden permission-geprüften Request
  * in jeder App. Das ist gewollt (sicher), aber macht converge_access zum
  * Single-Point-of-Failure für die gesamte Plattform-Berechtigung.
  */
 
 import { serviceClient } from './serviceClient';
+
+/** Obergrenze eines Permission-Lookups inkl. Wiederholungen, wie beim Sitzungsstatus. */
+export const PERMISSION_LOOKUP_TIMEOUT_MS = 5_000;
 
 /**
  * Liefert alle effektiven Permission-Keys eines Users.
@@ -51,6 +57,8 @@ export async function getUserPermissions(convergeId: string): Promise<string[]> 
     'converge_access',
     'GET',
     `/api/internal/users/${encodeURIComponent(convergeId)}/permissions`,
+    undefined,
+    { timeoutMs: PERMISSION_LOOKUP_TIMEOUT_MS },
   );
   return keys ?? [];
 }

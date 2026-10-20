@@ -243,6 +243,42 @@ exported for app-side use. CSV is CSV: Excel turns `01067` into `1067` and long 
 strings into `1,23E+18`, and shows the `'` in front of `+49 …` — point users to the
 Excel export for such data. No backend or kernel change.
 
+**Next minor (planned 1.23.0, not yet released) — exchange, cookie and S2S hardening.**
+Needs a kernel with efaware/efa_kernel#106 and #107 first (gateway exchange token
+`gw: 'app'`, provenance `jti`, cookie filter). Then:
+
+- `POST /api/auth/exchange` rejects tokens with `purpose` or `serviceKey` (delegation,
+  RAG, run-as), with a `gw` other than `'app'`, with `forcePasswordChange: true` and with a
+  tenant other than `default` (`classifyPlatformToken`). The gateway exchange token
+  (`gw: 'app'`) is accepted only together with the gateway's provenance token for this app
+  (`sub=converge_kernel`, `aud=SERVICE_KEY`), so an app that received one cannot replay it
+  at another app. Kernel first: before efaware/efa_kernel#106 tokens carry no `gw`.
+- `app_session` lives on `/apps/<SERVICE_KEY>/` instead of `/` when `NODE_ENV=production`
+  (every app image sets it); `/` otherwise, `APP_SESSION_COOKIE_PATH` overrides (set it to
+  `/` to run a built image locally without the gateway). With an app-specific cookie name
+  the exchange deletes a legacy cookie on `/`; the generic `app_session` is left alone,
+  it may belong to another app.
+- `requireRegistryKey({ allowedCallers })`, `requireInternalOrAuth({ allowedCallers })`,
+  `requireInternalOrAdminOrPermission({ allowedCallers }, ...keys)`; the plain forms keep
+  working. `req.callerService` carries the verified caller. Provenance tokens older than
+  60 s are rejected, each `jti` is accepted once per app (in-memory, bounded); tokens
+  without `jti` (older kernel) still pass.
+- `APP_SESSION_SECRET`: missing or placeholder → `createExchangeRouter` throws at startup
+  in production (outside production it logs, so test suites that build the router before
+  setting env keep working); shorter than 32 bytes → warning, start abort with
+  `APP_SESSION_SECRET_STRICT=true`.
+- `requireInternalOrAdminOrPermission` throws when an options object is not the first
+  argument (it would otherwise be ignored silently).
+- `serviceClient` no longer retries 4xx (`ServiceClientError` with `status`), new
+  `call(…, body, { timeoutMs })`; permission lookups time out after 5 s.
+- `registerPermissions` no longer falls back to `CONVERGE_REGISTRY_URL` +
+  `/api/registry/services/:key/permissions` (that kernel route always answered 500 and is
+  removed in efaware/efa_kernel for efa #287); without `CONVERGE_GATEWAY_URL` it logs and
+  skips. `options.registryBaseUrl` is ignored.
+- `isFromPlatformParent` also checks `event.origin === window.location.origin`. The kernel
+  embeds SDK apps same-origin under `/apps/<key>/`; an app embedded from a foreign origin
+  no longer accepts platform messages.
+
 ## License
 
 [Apache-2.0](./LICENSE) — permissive with a patent grant, so customers and partners

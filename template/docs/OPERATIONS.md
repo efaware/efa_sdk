@@ -14,7 +14,8 @@ cp .env.example .env
 # Set JWT_PUBLIC_KEY (base64-encoded RSA public key from efa-one)
 # Set APP_SESSION_SECRET (generate: openssl rand -hex 32)
 # Set DATABASE_URL or APP_DB_* vars
-# Set ENVIRONMENT=development
+# Set ENVIRONMENT=development and COOKIE_SECURE=false
+#   (.env.example ships production values)
 
 # 2. Backend
 cd backend

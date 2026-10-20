@@ -29,6 +29,7 @@
  */
 
 import { serviceClient } from './serviceClient';
+import { PERMISSION_LOOKUP_TIMEOUT_MS } from './permissionClient';
 
 export async function checkPermission(
   convergeId: string,
@@ -43,6 +44,7 @@ export async function checkPermission(
     'POST',
     '/api/internal/check-permission',
     { convergeId, key, sourceApp: sourceApp ?? process.env.APP_NAME ?? null },
+    { timeoutMs: PERMISSION_LOOKUP_TIMEOUT_MS },
   );
   return Boolean(granted);
 }

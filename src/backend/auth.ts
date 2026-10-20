@@ -4,6 +4,16 @@ import { Pool } from 'pg';
 import { getUserPermissions } from './permissionClient';
 import { getSessionStatus } from './sessionStatusClient';
 import { isPlatformAdmin, isPlatformAdminPermission } from './platformAdmin';
+import {
+  assertProvenanceOptions,
+  getPlatformPublicKey,
+  isTruthyEnv,
+  verifyServiceProvenance,
+  SERVICE_KEY_RE,
+  type ProvenanceGuardOptions,
+} from './serviceProvenance';
+
+export type { ProvenanceGuardOptions } from './serviceProvenance';
 
 // Plattformweite JWT-Claims (Finding #9). Muss identisch zum Kernel
 // (`backend/src/jwtClaims.ts`) sein — dort signiert, hier verifiziert. Bewusst
@@ -24,6 +34,12 @@ export interface JwtPayload {
   forcePasswordChange?: boolean;
   /** Token-ID. Jedes Kernel-Token trägt eine; Grundlage der Sitzungs-Entwertung. */
   jti?: string;
+  /**
+   * Vom Kernel-Gateway ausgestelltes Token (seit efa_kernel#106): `app` =
+   * Sitzungs-Tausch einer App, `kernel` = Bearer für kernel-native Ziele.
+   * Technische Markierung, keine Benutzerinfo.
+   */
+  gw?: string;
 }
 
 export interface SessionPayload {
@@ -56,15 +72,15 @@ const KERNEL_SUB_RE = /^[A-Za-z0-9._:@-]{1,128}$/;
 
 export interface AuthRequest extends Request {
   user?: SessionPayload;
+  /**
+   * Aufrufender Service (`sub` des verifizierten Provenance-Tokens, seit 1.23).
+   * Gesetzt von `requireRegistryKey` und den `requireInternalOr*`-Guards, wenn
+   * der Request über den Gateway von einem Service kam; sonst `undefined`.
+   */
+  callerService?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function getPlatformPublicKey(): string {
-  const s = process.env.JWT_PUBLIC_KEY;
-  if (!s) throw new Error('JWT_PUBLIC_KEY environment variable is required');
-  return Buffer.from(s, 'base64').toString('utf8');
-}
 
 function getSessionSecret(): string {
   const s = process.env.APP_SESSION_SECRET;
@@ -72,27 +88,175 @@ function getSessionSecret(): string {
   return s;
 }
 
+/** Mindestlänge des `APP_SESSION_SECRET` in Byte (HS256-Schlüssel = Hash-Breite). */
+export const APP_SESSION_SECRET_MIN_BYTES = 32;
+
+/**
+ * Bekannte Platzhalter aus `.env.example`-Dateien. Wer einen davon als Secret
+ * fährt, signiert seine Sitzungen mit einem öffentlich bekannten Schlüssel.
+ */
+const SESSION_SECRET_PLACEHOLDER_PREFIXES = ['changeme', 'change-me', 'change_me', 'please_change', 'replace_me', 'your-'];
+const SESSION_SECRET_PLACEHOLDERS = new Set(['secret', 'password', 'test', 'dev', 'development', 'app_session_secret']);
+
+export type SessionSecretVerdict =
+  | { ok: true }
+  | { ok: false; level: 'error' | 'warn'; reason: 'missing' | 'placeholder' | 'too_short'; message: string };
+
+/**
+ * Prüft `APP_SESSION_SECRET` (efa #290). Rein, ohne Seiteneffekte.
+ *
+ * Das Secret ist die einzige Schranke gegen gefälschte App-Sitzungen: der
+ * Sitzungsstatus beim Kernel kennt nur `jti`s, die es gibt, und eine
+ * erfundene `jti` gilt dort als aktiv. Stufen:
+ *
+ *  - fehlt oder bekannter Platzhalter → `error`. Eine efaTech-Instanz hat nie
+ *    einen Platzhalter, der Deployer erzeugt das Secret selbst (`randomSecret(32)`).
+ *  - kürzer als 32 Byte → `warn`, mit `APP_SESSION_SECRET_STRICT=true` `error`.
+ *    Bestandsinstanzen mit kurzem, aber geheimem Wert sollen durch ein SDK-Minor
+ *    nicht ausfallen; das Template setzt den Schalter für neue Apps, ein späterer
+ *    Major macht ihn zur Vorgabe.
+ *
+ * Was ein `error` bewirkt, entscheidet `assertSessionSecret`.
+ */
+export function checkSessionSecret(secret: string | undefined): SessionSecretVerdict {
+  if (!secret) {
+    return { ok: false, level: 'error', reason: 'missing', message: 'APP_SESSION_SECRET ist nicht gesetzt. Erzeugen mit: openssl rand -hex 32' };
+  }
+  const lower = secret.trim().toLowerCase();
+  if (SESSION_SECRET_PLACEHOLDERS.has(lower) || SESSION_SECRET_PLACEHOLDER_PREFIXES.some((p) => lower.startsWith(p))) {
+    return {
+      ok: false,
+      level: 'error',
+      reason: 'placeholder',
+      message: 'APP_SESSION_SECRET ist ein Platzhalter aus einer Beispiel-Konfiguration. Echten Wert setzen: openssl rand -hex 32',
+    };
+  }
+  const bytes = Buffer.byteLength(secret, 'utf8');
+  if (bytes < APP_SESSION_SECRET_MIN_BYTES) {
+    return {
+      ok: false,
+      level: isTruthyEnv(process.env.APP_SESSION_SECRET_STRICT) ? 'error' : 'warn',
+      reason: 'too_short',
+      message: `APP_SESSION_SECRET ist ${bytes} Byte lang, verlangt sind mindestens ${APP_SESSION_SECRET_MIN_BYTES}. Neu erzeugen mit: openssl rand -hex 32`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Prüft `APP_SESSION_SECRET` beim Aufbau des Exchange-Routers (`createExchangeRouter`,
+ * jede App mountet ihn beim Start).
+ *
+ * Ein `error` bricht den Start **in Produktion** ab (`NODE_ENV=production`, das
+ * setzt jedes App-Image) — eine App mit fehlendem oder öffentlich bekanntem
+ * Secret startet dort nicht und nennt den Grund. Außerhalb von Produktion wird
+ * er nur geloggt: Test-Suites bauen den Router oft beim Import, bevor sie die
+ * Env setzen, und liefen bis 1.22 durch (fehlendes Secret fiel erst beim ersten
+ * Request auf, das bleibt so). `APP_SESSION_SECRET_STRICT=true` bricht bei
+ * jedem `error` ab, auch außerhalb von Produktion.
+ */
+export function assertSessionSecret(): void {
+  const verdict = checkSessionSecret(process.env.APP_SESSION_SECRET);
+  if (verdict.ok) return;
+  const fatal = verdict.level === 'error'
+    && (process.env.NODE_ENV === 'production' || isTruthyEnv(process.env.APP_SESSION_SECRET_STRICT));
+  if (fatal) throw new Error(verdict.message);
+  const level = verdict.level === 'error' ? 'error' : 'warn';
+  console[level](JSON.stringify({ level, msg: verdict.message, reason: verdict.reason }));
+}
+
+const DEFAULT_COOKIE_NAME = 'app_session';
+
 function getCookieName(): string {
-  return process.env.APP_SESSION_COOKIE_NAME || 'app_session';
+  return process.env.APP_SESSION_COOKIE_NAME || DEFAULT_COOKIE_NAME;
+}
+
+/**
+ * Pfad des Sitzungs-Cookies (efa #286).
+ *
+ * Alle Apps liegen unter derselben Origin (`/apps/<serviceKey>/` hinter dem
+ * Gateway). Mit `path=/` schickt der Browser das Cookie jeder App an **jede**
+ * App — eine fremde App sieht damit die Sitzungen aller anderen, und Apps mit dem
+ * generischen Namen `app_session` überschreiben sich gegenseitig. Seit 1.23 liegt
+ * das Cookie deshalb auf dem eigenen Präfix:
+ *
+ *  1. `APP_SESSION_COOKIE_PATH`, wenn gesetzt (muss mit `/` beginnen),
+ *  2. `/apps/<SERVICE_KEY>/` in Produktion (`NODE_ENV=production`, das setzt
+ *     jedes App-Image),
+ *  3. sonst `/` — lokale Entwicklung ohne Gateway (`npm run dev`, Vite-Proxy auf
+ *     `/api`, `/dev/token`), dort gibt es kein Präfix; ebenso ohne gültigen
+ *     `SERVICE_KEY`.
+ *
+ * Bewusst nicht an `ENVIRONMENT`: ältere `.env.example`-Fassungen trugen
+ * `ENVIRONMENT=development`, und solche Werte stehen auf Bestandsinstanzen noch
+ * in der App-`.env`. Wer das gebaute Image lokal ohne Gateway betreibt
+ * (`docker compose up` mit Aufruf über den Frontend-Port), setzt
+ * `APP_SESSION_COOKIE_PATH=/`.
+ *
+ * Die App-Backends selbst sehen den Präfix nicht (der Gateway schreibt ihn weg);
+ * das ändert nichts, der Pfad wirkt nur im Browser. Der Gateway-Sitzungs-Tausch
+ * liest nur `name=wert` aus dem `Set-Cookie` und ist vom Pfad unberührt.
+ */
+export function getSessionCookiePath(): string {
+  const explicit = process.env.APP_SESSION_COOKIE_PATH?.trim();
+  if (explicit) return explicit;
+  if (process.env.NODE_ENV !== 'production') return '/';
+  const serviceKey = process.env.SERVICE_KEY;
+  if (serviceKey && SERVICE_KEY_RE.test(serviceKey)) return `/apps/${serviceKey}/`;
+  return '/';
+}
+
+function assertSessionCookiePath(): void {
+  const path = getSessionCookiePath();
+  // `;`/`,`/Leerraum würden das Set-Cookie-Attribut aufbrechen.
+  if (!path.startsWith('/') || /[;,\s]/.test(path)) {
+    throw new Error(`APP_SESSION_COOKIE_PATH ungültig: ${JSON.stringify(path)} (muss mit / beginnen, ohne ; , oder Leerzeichen)`);
+  }
+}
+
+function isSecureCookie(): boolean {
+  // secure-Flag (Finding #7): explizites COOKIE_SECURE gewinnt, sonst automatisch
+  // in Produktion an. Verhindert, dass der app_session-Cookie in Prod über HTTP
+  // ausgeliefert wird, wenn COOKIE_SECURE vergessen wurde.
+  return process.env.COOKIE_SECURE
+    ? isTruthyEnv(process.env.COOKIE_SECURE)
+    : process.env.NODE_ENV === 'production';
 }
 
 function setSessionCookie(res: Response, token: string, maxAgeMs: number): void {
-  // secure-Flag (Finding #7): explizites COOKIE_SECURE gewinnt, sonst automatisch
-  // in Produktion an. Verhindert, dass der app_session-Cookie in Prod über HTTP
-  // ausgeliefert wird, wenn COOKIE_SECURE vergessen wurde. sameSite:'lax' blockt
-  // Cross-Site-POST-Cookies (CSRF-Grundschutz).
-  const secure = process.env.COOKIE_SECURE
-    ? ['1', 'true', 'yes', 'on'].includes(process.env.COOKIE_SECURE.toLowerCase())
-    : process.env.NODE_ENV === 'production';
+  // sameSite:'lax' blockt Cross-Site-POST-Cookies (CSRF-Grundschutz).
   res.cookie(getCookieName(), token, {
     httpOnly: true,
     sameSite: 'lax',
     // So lange wie das eingetauschte Kernel-Token (efa-Task #137) — nicht mehr
     // pauschal 8 h ab Exchange.
     maxAge: maxAgeMs,
-    secure,
-    path: '/',
+    secure: isSecureCookie(),
+    path: getSessionCookiePath(),
   });
+}
+
+/**
+ * Übergang `path=/` → `path=/apps/<key>/` (seit 1.23): ein vor dem Update
+ * ausgestelltes Cookie liegt noch auf `/`. Es bliebe bis zu seinem Ablauf
+ * (höchstens 8 h) neben dem neuen liegen und ginge weiter an jede App. Der
+ * Exchange löscht es deshalb aktiv, sobald der Browser eins mitschickt — nur
+ * bei einem app-eigenen Cookie-Namen (siehe unten).
+ *
+ * Zwei gleichnamige Cookies stören die App in der Zwischenzeit nicht: der
+ * Browser schickt das mit dem längeren Pfad zuerst (RFC 6265, 5.4), und
+ * `cookie-parser` nimmt das erste. Gelöscht wird nach dem Setzen des neuen
+ * Cookies, damit es im `Set-Cookie` vorne steht — der Gateway-Tausch liest nur
+ * das erste (er schickt aber ohnehin kein Cookie mit, löst das Löschen also nie aus).
+ */
+function clearLegacySessionCookie(req: Request, res: Response): void {
+  if (getSessionCookiePath() === '/') return;
+  // Nicht beim generischen Namen: `app_session` auf `/` kann einer anderen,
+  // noch nicht aktualisierten App gehören — sie verlöre bei jedem Tausch dieser
+  // App ihre Sitzung. Ein eigener Name (`<serviceKey>_app_session`) gehört nur ihr.
+  if (getCookieName() === DEFAULT_COOKIE_NAME) return;
+  if (req.cookies?.[getCookieName()] === undefined) return;
+  res.clearCookie(getCookieName(), { httpOnly: true, sameSite: 'lax', secure: isSecureCookie(), path: '/' });
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -243,72 +407,205 @@ export function requireAdminOrPermission(...permissionKeys: string[]) {
   };
 }
 
-// Provenance: der Converge-Gateway mintet nach erfolgreicher Caller-Auth ein
-// kurzlebiges RS256-Token (`X-Service-Token`), das kryptografisch beweist, dass
-// der Request durch den Gateway von einem authentifizierten Service kam. Wir
-// verifizieren es mit dem vorhandenen JWT_PUBLIC_KEY. `iss='converge-gateway'`
-// grenzt es sauber von User-Tokens (`iss='converge'`) ab; `aud` muss der eigene
-// SERVICE_KEY sein (Gateway hat aud = Ziel-serviceKey gesetzt). Ersetzt den
-// vormals geteilten REGISTRY_API_KEY-String-Vergleich.
-const PROVENANCE_ISSUER = 'converge-gateway';
+// ─── Service-zu-Service (Gateway-Provenance) ─────────────────────────────────
+//
+// Der Converge-Gateway mintet nach erfolgreicher Caller-Auth ein kurzlebiges
+// RS256-Token (`X-Service-Token`), das kryptografisch beweist, dass der Request
+// durch den Gateway von einem authentifizierten Service kam. Prüfung und
+// Replay-Schutz: `serviceProvenance.ts`. Ersetzt den vormals geteilten
+// REGISTRY_API_KEY-String-Vergleich.
 
-/** true, wenn ein gültiges Provenance-Token für DIESEN Service vorliegt. */
-function hasValidServiceProvenance(req: Request): boolean {
-  const token = req.headers['x-service-token'] as string | undefined;
-  if (!token) return false;
-  const audience = process.env.SERVICE_KEY;
-  if (!audience) return false;
-  try {
-    jwt.verify(token, getPlatformPublicKey(), {
-      algorithms: ['RS256'],
-      issuer: PROVENANCE_ISSUER,
-      audience,
-    });
-    return true;
-  } catch {
-    return false;
-  }
+type Guard = (req: AuthRequest, res: Response, next: NextFunction) => void;
+
+function isMiddlewareCall(res: unknown, next: unknown): res is Response {
+  return res !== undefined && typeof next === 'function';
 }
 
-/**
- * requireRegistryKey – Service-zu-Service-Auth.
- * Schützt /api/internal/*-Endpunkte. Nur Aufrufe mit gültigem
- * Gateway-Provenance-Token (`X-Service-Token`) für diesen Service passieren.
- */
-export function requireRegistryKey(req: Request, res: Response, next: NextFunction): void {
-  if (hasValidServiceProvenance(req)) {
-    next();
+function rejectProvenance(res: Response, result: ReturnType<typeof verifyServiceProvenance>): void {
+  if (!result.ok && result.reason === 'caller_not_allowed') {
+    res.status(403).json({ error: 'Service caller not allowed' });
     return;
   }
   res.status(401).json({ error: 'Service provenance token required' });
 }
 
+function registryKeyGuard(options: ProvenanceGuardOptions): Guard {
+  return (req, res, next) => {
+    const result = verifyServiceProvenance(req, options);
+    if (result.ok) {
+      next();
+      return;
+    }
+    rejectProvenance(res, result);
+  };
+}
+
+function internalOrAuthGuard(options: ProvenanceGuardOptions): Guard {
+  return (req, res, next) => {
+    if (verifyServiceProvenance(req, options).ok) {
+      next();
+      return;
+    }
+    // Kein (zulässiger) Service-Aufruf: als Benutzer-Request behandeln. Das
+    // deckt auch delegierte Aufrufe ab, bei denen der Gateway zusätzlich ein
+    // eingetauschtes app_session-Cookie mitschickt — der Benutzer muss dann
+    // die Route selbst dürfen.
+    requireAuth(req, res, next);
+  };
+}
+
+/**
+ * Beide Formen eines Guards: direkt als Middleware (`router.use(guard)`, Express
+ * ruft mit `(req, res, next)`) oder als Fabrik mit Optionen (`guard({ … })`).
+ */
+function dualGuard(
+  factory: (options: ProvenanceGuardOptions) => Guard,
+  a: unknown,
+  res?: Response,
+  next?: NextFunction,
+): Guard | void {
+  if (isMiddlewareCall(res, next)) {
+    factory({})(a as AuthRequest, res, next as NextFunction);
+    return;
+  }
+  const options = (a ?? {}) as ProvenanceGuardOptions;
+  assertProvenanceOptions(options);
+  return factory(options);
+}
+
+/**
+ * requireRegistryKey – Service-zu-Service-Auth.
+ * Schützt /api/internal/*-Endpunkte. Nur Aufrufe mit gültigem
+ * Gateway-Provenance-Token (`X-Service-Token`) für diesen Service passieren;
+ * der Aufrufer steht danach in `req.callerService`.
+ *
+ * Zwei Formen:
+ *   router.use(requireRegistryKey);                                   // jeder Service
+ *   router.use(requireRegistryKey({ allowedCallers: ['converge_chat'] })); // nur diese
+ *
+ * Ein Aufrufer außerhalb von `allowedCallers` bekommt 403, ein fehlendes,
+ * ungültiges, zu altes oder schon verwendetes Token 401.
+ */
+export function requireRegistryKey(options: ProvenanceGuardOptions): Guard;
+export function requireRegistryKey(req: Request, res: Response, next: NextFunction): void;
+export function requireRegistryKey(a: Request | ProvenanceGuardOptions, res?: Response, next?: NextFunction): Guard | void {
+  return dualGuard(registryKeyGuard, a, res, next);
+}
+
 /**
  * requireInternalOrAuth – akzeptiert ein gültiges Gateway-Provenance-Token
  * (Service-to-Service) ODER ein gültiges App-Session-JWT.
+ *
+ * Mit `{ allowedCallers }` zählt der Service-Weg nur für diese Aufrufer; jeder
+ * andere Request braucht eine Benutzer-Sitzung.
  */
-export function requireInternalOrAuth(req: AuthRequest, res: Response, next: NextFunction): void {
-  if (hasValidServiceProvenance(req)) {
-    next();
-    return;
-  }
-  requireAuth(req, res, next);
+export function requireInternalOrAuth(options: ProvenanceGuardOptions): Guard;
+export function requireInternalOrAuth(req: AuthRequest, res: Response, next: NextFunction): void;
+export function requireInternalOrAuth(a: AuthRequest | ProvenanceGuardOptions, res?: Response, next?: NextFunction): Guard | void {
+  return dualGuard(internalOrAuthGuard, a, res, next);
 }
 
 /**
  * requireInternalOrAdminOrPermission – akzeptiert ein Gateway-Provenance-Token,
  * einen Plattform-Admin (`efa-all`, im Übergang auch `converge-admin`) oder eine
- * der angegebenen App-Permissions. Live-Lookup für die
- * User-Variante.
+ * der angegebenen App-Permissions. Live-Lookup für die User-Variante.
+ *
+ *   requireInternalOrAdminOrPermission('myapp.read')
+ *   requireInternalOrAdminOrPermission({ allowedCallers: ['converge_chat'] }, 'myapp.read')
  */
-export function requireInternalOrAdminOrPermission(...permissionKeys: string[]) {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    if (hasValidServiceProvenance(req)) {
+export function requireInternalOrAdminOrPermission(...permissionKeys: string[]): Guard;
+export function requireInternalOrAdminOrPermission(options: ProvenanceGuardOptions, ...permissionKeys: string[]): Guard;
+export function requireInternalOrAdminOrPermission(...args: (string | ProvenanceGuardOptions)[]): Guard {
+  const [first, ...rest] = args;
+  const options: ProvenanceGuardOptions = typeof first === 'object' && first !== null ? first : {};
+  const keys = typeof first === 'string' ? args : rest;
+  if (!keys.every((a) => typeof a === 'string')) {
+    throw new Error('requireInternalOrAdminOrPermission: Optionen nur als erstes Argument, danach Permission-Keys');
+  }
+  const permissionKeys = keys as string[];
+  assertProvenanceOptions(options);
+  const userGuard = requireAdminOrPermission(...permissionKeys);
+  return (req, res, next) => {
+    if (verifyServiceProvenance(req, options).ok) {
       next();
       return;
     }
-    requireAdminOrPermission(...permissionKeys)(req, res, next);
+    userGuard(req, res, next);
   };
+}
+
+// ─── Exchange-Vorfilter ───────────────────────────────────────────────────────
+
+/** Einzige Tenant-Kennung dieser Plattform (Multi-Tenancy bewusst nicht unterstützt). */
+const PLATFORM_TENANT = 'default';
+
+/** Aufrufer, als der der Kernel-Gateway den Sitzungs-Tausch ausführt (`exchangeForSession`). */
+const GATEWAY_EXCHANGE_CALLER = 'converge_kernel';
+
+/** Ergebnis der Claim-Prüfung eines eingereichten Plattform-Tokens. */
+export type PlatformTokenVerdict =
+  /** Reguläres Login- bzw. Gateway-Tausch-Token — der Exchange darf übernehmen. */
+  | { ok: true }
+  /** Zweckgebundenes Token (Delegation, RAG, Run-as, Kernel-Ziel) — begründet keine Sitzung. */
+  | { ok: false; status: 401; error: string; code: 'delegation_token_not_accepted' }
+  /** Konto muss erst sein Passwort ändern. */
+  | { ok: false; status: 403; error: 'Password change required'; code: 'FORCE_PASSWORD_CHANGE' }
+  /** Fremder Tenant — diese Installation kennt nur einen. */
+  | { ok: false; status: 403; error: 'tenant_not_supported'; code: 'tenant_not_supported' };
+
+/**
+ * Prüft die Claims eines bereits verifizierten Plattform-Tokens darauf, ob es
+ * eine App-Sitzung begründen darf (efa #282). Rein, ohne Express.
+ *
+ * Bis 1.22 tauschte der Exchange alles, was mit dem Plattform-Schlüssel signiert
+ * war und `iss`/`aud` = `converge` trug — also auch Tokens, die nie ein Login
+ * sein sollten. Abgewiesen werden jetzt:
+ *
+ *  - `serviceKey`-Claim: der RAG-Service-JWT von efa-chat (5 min, geht nur an efa-ai),
+ *  - `purpose`-Claim, egal welcher: `mcp-delegation` (efa-chat, 10 min),
+ *    `rag-search`/`rag-source`, `mcp-run-as` (Kernel). Seit efa_kernel#86/#106
+ *    tauscht der Gateway nicht mehr das eingehende Delegations-Token, sondern
+ *    stellt ein eigenes, zweckfreies aus; keine Tokenart mit `purpose` hat am
+ *    Exchange noch etwas zu suchen. Es gibt deshalb keine Ausnahmeliste.
+ *  - `gw` mit einem anderen Wert als `'app'`: `gw: 'app'` ist genau dieses
+ *    Gateway-Tausch-Token (60 s, efa_kernel#106) und bleibt der normale Weg —
+ *    der Exchange verlangt dafür zusätzlich das Provenance-Token des Gateways.
+ *    `gw: 'kernel'` ist ein Bearer für kernel-native Ziele und erreicht eine App
+ *    nie — taucht es hier auf, ist es abgegriffen.
+ *  - `forcePasswordChange: true`: der Kernel sperrt solche Konten bis zum
+ *    Passwortwechsel (`FORCE_PASSWORD_CHANGE`). Im Browser fängt das schon das
+ *    Gateway ab, ein direkter Aufruf im `converge-net` nicht.
+ *  - `tenant` ungleich `'default'` (auch fehlend): diese Plattform hat genau
+ *    einen Tenant; der Claim wanderte sonst ungeprüft in die Sitzung.
+ *
+ * `serviceKey` wird vor `purpose` geprüft: der RAG-Service-JWT trägt beides und
+ * bleibt so erkennbar, auch wenn eine künftige Signierstelle `purpose` vergisst.
+ */
+export function classifyPlatformToken(payload: Record<string, unknown>): PlatformTokenVerdict {
+  const serviceKey = payload.serviceKey;
+  if (serviceKey !== undefined && serviceKey !== null && serviceKey !== '') {
+    return { ok: false, status: 401, error: 'Service-Token begründet keine Sitzung', code: 'delegation_token_not_accepted' };
+  }
+  const purpose = payload.purpose;
+  if (purpose !== undefined && purpose !== null && purpose !== '') {
+    const label = typeof purpose === 'string' ? purpose.slice(0, 64) : typeof purpose;
+    return {
+      ok: false,
+      status: 401,
+      error: `Zweckgebundenes Token (purpose=${label}) begründet keine Sitzung`,
+      code: 'delegation_token_not_accepted',
+    };
+  }
+  if (payload.gw !== undefined && payload.gw !== 'app') {
+    return { ok: false, status: 401, error: 'Gateway-Token für ein anderes Ziel begründet keine Sitzung', code: 'delegation_token_not_accepted' };
+  }
+  if (payload.forcePasswordChange === true) {
+    return { ok: false, status: 403, error: 'Password change required', code: 'FORCE_PASSWORD_CHANGE' };
+  }
+  if (payload.tenant !== PLATFORM_TENANT) {
+    return { ok: false, status: 403, error: 'tenant_not_supported', code: 'tenant_not_supported' };
+  }
+  return { ok: true };
 }
 
 // ─── Token Exchange Router ────────────────────────────────────────────────────
@@ -327,6 +624,9 @@ export function requireInternalOrAdminOrPermission(...permissionKeys: string[]) 
  * converge_access-Service nach (siehe permissionClient.ts).
  */
 export function createExchangeRouter(pool: Pool): Router {
+  // Fail-fast beim Start statt beim ersten Login (efa #290, #286).
+  assertSessionSecret();
+  assertSessionCookiePath();
   const router = Router();
 
   router.post('/exchange', async (req: Request, res: Response) => {
@@ -348,6 +648,39 @@ export function createExchangeRouter(pool: Pool): Router {
     } catch {
       res.status(401).json({ error: 'Invalid or expired platform token' });
       return;
+    }
+
+    // Vorfilter (efa #282): nur Login- und Gateway-Tausch-Tokens begründen eine Sitzung.
+    const verdict = classifyPlatformToken(convergePayload as unknown as Record<string, unknown>);
+    if (!verdict.ok) {
+      console.warn(JSON.stringify({
+        level: 'warn',
+        msg: 'Token-Exchange abgelehnt',
+        code: verdict.code,
+        sub: typeof convergePayload.sub === 'string' ? convergePayload.sub : null,
+      }));
+      res.status(verdict.status).json({ error: verdict.error, code: verdict.code });
+      return;
+    }
+
+    // Das Gateway-Tausch-Token (`gw: 'app'`) gilt nur auf dem Tausch-Aufruf des
+    // Gateways an DIESE App. Es trägt `aud: converge` wie jedes Plattform-Token und
+    // wäre sonst 60 s lang an jeder anderen App tauschbar — eine App, die es für
+    // sich bekommen hat, holte sich damit eine Sitzung bei einer anderen. Der
+    // Gateway legt dem Aufruf ein Provenance-Token bei (sub=converge_kernel,
+    // aud=Ziel-App, seit efa #264); das bindet den Tausch an den Gateway und an
+    // diese App. Tokens älterer Kernel ohne `gw` sind davon nicht betroffen.
+    if (convergePayload.gw === 'app') {
+      const provenance = verifyServiceProvenance(req, { allowedCallers: [GATEWAY_EXCHANGE_CALLER] });
+      if (!provenance.ok) {
+        console.warn(JSON.stringify({
+          level: 'warn',
+          msg: 'Token-Exchange abgelehnt: Gateway-Tausch-Token ohne Herkunftsnachweis',
+          reason: provenance.reason,
+        }));
+        res.status(401).json({ error: 'Gateway-Tausch-Token nur auf dem Tausch-Aufruf des Gateways', code: 'gateway_provenance_required' });
+        return;
+      }
     }
 
     // Bindung an die Kernel-Sitzung (efa-Task #137): jedes Kernel-Token trägt
@@ -403,6 +736,7 @@ export function createExchangeRouter(pool: Pool): Router {
 
       const sessionToken = jwt.sign(sessionPayload, getSessionSecret(), { algorithm: 'HS256', expiresIn: remainingSec });
       setSessionCookie(res, sessionToken, remainingSec * 1000);
+      clearLegacySessionCookie(req, res);
 
       res.json({
         user: {
@@ -420,7 +754,13 @@ export function createExchangeRouter(pool: Pool): Router {
   });
 
   router.post('/logout', (_req: Request, res: Response) => {
-    res.clearCookie(getCookieName());
+    const opts = { httpOnly: true, sameSite: 'lax' as const, secure: isSecureCookie() };
+    res.clearCookie(getCookieName(), { ...opts, path: getSessionCookiePath() });
+    // Übergang: ein vor 1.23 ausgestelltes Cookie liegt auf `/` (nicht beim
+    // generischen Namen, der kann einer anderen App gehören).
+    if (getSessionCookiePath() !== '/' && getCookieName() !== DEFAULT_COOKIE_NAME) {
+      res.clearCookie(getCookieName(), { ...opts, path: '/' });
+    }
     res.json({ ok: true });
   });
 

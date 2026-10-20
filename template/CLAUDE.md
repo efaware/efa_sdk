@@ -270,6 +270,57 @@ Exchange klappt also. Jeder `requireAuth`-geschützte Request braucht aber den
 Kernel-Endpoint und antwortet ohne laufenden Stack mit 503 — für geschützte Routen
 den vollständigen Stack lokal starten (`CONVERGE_GATEWAY_URL` + `SERVICE_AUTH_KEY`).
 
+### Exchange, Cookie und Service-Aufrufe ab `@efa-one/sdk` 1.23
+
+**Exchange-Vorfilter (efa #282).** `POST /api/auth/exchange` tauscht nur noch Login-
+und Gateway-Tausch-Tokens (`gw: 'app'`). Abgewiesen werden Tokens mit `purpose`
+(Delegation, RAG, Run-as) oder `serviceKey` (401 `delegation_token_not_accepted`),
+mit `gw` ungleich `'app'` (401), mit `forcePasswordChange: true`
+(403 `FORCE_PASSWORD_CHANGE`) und mit `tenant` ungleich `'default'`
+(403 `tenant_not_supported`). Das Gateway-Tausch-Token (`gw: 'app'`) gilt nur mit dem
+Provenance-Token, das der Gateway dem Tausch-Aufruf an genau diese App beilegt
+(`sub=converge_kernel`, `aud=SERVICE_KEY`); sonst 401 `gateway_provenance_required` — eine
+App, die so ein Token für sich bekommen hat, kann es nicht bei einer anderen eintauschen.
+Ein eigener Vorfilter vor dem Exchange ist nicht mehr nötig. Die Claim-Prüfung steht als
+`classifyPlatformToken()` auch einzeln bereit.
+
+**Cookie-Pfad (efa #286).** `app_session` liegt im gebauten Image (`NODE_ENV=production`)
+auf `/apps/<SERVICE_KEY>/` statt auf `/`; der Browser schickt es damit nur noch an diese
+App. Bei `npm run dev` bleibt es auf `/` (lokal ohne Gateway), `APP_SESSION_COOKIE_PATH`
+überschreibt beides — `APP_SESSION_COOKIE_PATH=/`, wer das gebaute Image lokal über den
+Frontend-Port aufruft. Ein altes Cookie auf `/` löscht der Exchange, sobald der Browser es
+mitschickt (nur bei eigenem `APP_SESSION_COOKIE_NAME`; das generische `app_session` kann
+einer anderen App gehören); bis dahin gewinnt das neue (längerer Pfad, kommt zuerst). Für das Frontend ändert sich nichts, solange alle
+API-Aufrufe über den Gateway-Präfix laufen (`setApiBase('/apps/<key>')` in `useConvergeAuth`).
+
+**Service-Aufrufe eingrenzen (efa #287).** Der Aufrufer eines S2S-Requests steht nach
+`requireRegistryKey` bzw. den `requireInternalOr*`-Guards in `req.callerService`. Interne
+Routen auf die Apps beschränken, die sie fachlich brauchen:
+
+```ts
+router.use(requireRegistryKey({ allowedCallers: ['converge_chat', 'converge_kernel'] }));
+router.get('/', requireInternalOrAdminOrPermission({ allowedCallers: ['converge_chat'] }, 'myapp.read'), handler);
+```
+
+Ein Service außerhalb der Liste bekommt bei `requireRegistryKey` 403; bei den
+`requireInternalOr*`-Guards fällt er auf den Benutzer-Weg zurück (Sitzung + Permission).
+`converge_kernel` ist der Aufrufer bei MCP-Werkzeugen des Kernel-Agenten. Das
+Provenance-Token ist höchstens 60 s alt und gilt je App genau einmal (`jti`); mehrere
+Guards im selben Request sehen es trotzdem.
+
+**`APP_SESSION_SECRET` (efa #290)** braucht mindestens 32 Byte. Fehlt es oder ist es ein
+Platzhalter, startet die App in Produktion nicht (`createExchangeRouter` wirft; außerhalb
+von Produktion nur ein Log, damit Tests den Router beim Import bauen können). Ein kürzerer
+Wert erzeugt eine Warnung, mit `APP_SESSION_SECRET_STRICT=true` (Template-Vorgabe) einen
+Startabbruch.
+
+**`serviceClient`** wiederholt 4xx nicht mehr (`ServiceClientError` mit `status`) und kennt
+`call(…, body, { timeoutMs })`. Permission-Lookups brechen nach 5 s ab (fail-closed, 503).
+
+**Rollout-Reihenfolge:** Kernel ab efa_kernel#106/#107 zuerst, dann der App-Bump. Ein
+Kernel vor v1.0.0-rc.1 (ohne efa #264) reichte beim Gateway-Tausch noch das
+Delegations-Token weiter; das lehnt schon SDK ≥ 1.17 ab (keine `jti`).
+
 ## Fachliche Intake-Fragen (Pflicht — verbindlich für Claude)
 
 Diese App hat eine `docs/intake.md`. Sie enthält pro Kernel-/System-Service einen
@@ -1264,10 +1315,12 @@ if (isAdmin) {
 > **Sicherheitsregel für postMessage (plattformweit):** Auf der **Sende**-Seite
 > nie `'*'` als targetOrigin – immer `getParentOrigin()` aus `@efa-one/sdk/frontend/ipc`.
 > Auf der **Empfangs**-Seite jeden efa-one-Message-Handler zuerst mit
-> `isFromPlatformParent(event)` gaten (`event.source === window.parent`), sonst kann
-> ein Sibling-iframe/`window.opener` u. a. `CONVERGE_AUTH` fälschen (Session-Fixation).
-> Vollständiger Schutz gegen bösartige *Top-Level*-Einbettung zusätzlich per
-> `frame-ancestors`-CSP/`X-Frame-Options` (nginx-Ebene).
+> `isFromPlatformParent(event)` gaten (`event.source === window.parent` und, ab SDK 1.23,
+> `event.origin === window.location.origin`), sonst kann ein Sibling-iframe/`window.opener`
+> oder eine fremde Seite, die die App über einen direkt erreichbaren Port einbettet,
+> u. a. `CONVERGE_AUTH` fälschen (Session-Fixation). Der Kernel bettet Apps nur
+> same-origin unter `/apps/<key>/` ein. Gegen bösartige *Top-Level*-Einbettung
+> zusätzlich `frame-ancestors`-CSP/`X-Frame-Options` (nginx-Ebene).
 
 Sonst erscheint das Zahnrad-Symbol in der efa-one-Kopfzeile für alle User – führt zum Navigationsirrtum wenn der User in `/settings` landet und sofort wieder weitergeleitet wird.
 

@@ -32,6 +32,41 @@ export interface ServiceClientOptions {
   retryDelayMs?: number;
 }
 
+/** Optionen je Aufruf. */
+export interface ServiceCallOptions {
+  /**
+   * Obergrenze für den gesamten Aufruf inklusive Wiederholungen (ms). Danach
+   * wird der Request abgebrochen (`AbortSignal.timeout`) und der Aufruf wirft
+   * einen `ServiceClientError` mit `timedOut: true`. Ohne Angabe: kein Timeout.
+   */
+  timeoutMs?: number;
+}
+
+/**
+ * Fehler aus `ServiceClient.call` mit HTTP-Status der Gegenseite. Seit 1.23 eine
+ * eigene Klasse, damit die Wiederholungslogik ihn sicher von einem Netzwerkfehler
+ * unterscheidet: vorher wurde ein 4xx mit `error`-Text im Body wie ein
+ * Netzwerkfehler zweimal wiederholt (efa #290). `message` ist unverändert.
+ */
+export class ServiceClientError extends Error {
+  readonly status: number | null;
+  readonly serviceKey: string;
+  readonly timedOut: boolean;
+
+  constructor(message: string, serviceKey: string, status: number | null, timedOut = false) {
+    super(message);
+    this.name = 'ServiceClientError';
+    this.serviceKey = serviceKey;
+    this.status = status;
+    this.timedOut = timedOut;
+  }
+}
+
+function isAbortError(err: unknown): boolean {
+  const name = (err as { name?: unknown } | null)?.name;
+  return name === 'AbortError' || name === 'TimeoutError';
+}
+
 export class ServiceClient {
   private gatewayUrl: string;
   private registryKey: string;
@@ -61,6 +96,7 @@ export class ServiceClient {
     method: string,
     path: string,
     body?: unknown,
+    options: ServiceCallOptions = {},
   ): Promise<T> {
     if (!this.gatewayUrl) {
       throw new Error('ServiceClient: CONVERGE_GATEWAY_URL nicht gesetzt');
@@ -81,50 +117,71 @@ export class ServiceClient {
     if (body !== undefined && method !== 'GET' && method !== 'HEAD') {
       fetchOptions.body = JSON.stringify(body);
     }
+    if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
+      fetchOptions.signal = AbortSignal.timeout(options.timeoutMs);
+    }
+    const timedOut = (): ServiceClientError =>
+      new ServiceClientError(
+        `ServiceClient: ${serviceKey} ${method} ${path} → Timeout nach ${options.timeoutMs} ms`,
+        serviceKey,
+        null,
+        true,
+      );
 
     for (let attempt = 1; attempt <= this.retries + 1; attempt++) {
+      let res: Response;
       try {
-        const res = await this.fetchImpl(url, fetchOptions);
-
-        if (res.status === 204) {
-          return undefined as T;
-        }
-
-        if (!res.ok) {
-          let errorMessage = `ServiceClient: ${serviceKey} ${method} ${path} → ${res.status}`;
-          try {
-            const errBody = await res.json() as { error?: string };
-            if (errBody.error) errorMessage = errBody.error;
-          } catch { /* ignore parse error */ }
-
-          // Nicht retrybar: 4xx Client-Fehler
-          if (res.status >= 400 && res.status < 500) {
-            throw new Error(errorMessage);
-          }
-
-          // 5xx: Retry
-          if (attempt <= this.retries) {
-            log('warn', 'ServiceClient: Retry nach Server-Fehler', {
-              serviceKey, method, path, status: res.status, attempt,
-            });
-            await new Promise((r) => setTimeout(r, this.retryDelay));
-            continue;
-          }
-          throw new Error(errorMessage);
-        }
-
-        return res.json() as Promise<T>;
+        res = await this.fetchImpl(url, fetchOptions);
       } catch (err) {
-        if (err instanceof Error && !err.message.startsWith('ServiceClient:')) {
-          // Netzwerkfehler → Retry
-          if (attempt <= this.retries) {
-            log('warn', 'ServiceClient: Netzwerkfehler, Retry', {
-              serviceKey, method, path, err: String(err), attempt,
-            });
-            await new Promise((r) => setTimeout(r, this.retryDelay));
-            continue;
-          }
+        // Abgebrochen (Timeout): nicht wiederholen, die Frist gilt für den ganzen Aufruf.
+        if (isAbortError(err) || fetchOptions.signal?.aborted) throw timedOut();
+        // Netzwerkfehler → Retry
+        if (attempt <= this.retries) {
+          log('warn', 'ServiceClient: Netzwerkfehler, Retry', {
+            serviceKey, method, path, err: String(err), attempt,
+          });
+          await new Promise((r) => setTimeout(r, this.retryDelay));
+          if (fetchOptions.signal?.aborted) throw timedOut();
+          continue;
         }
+        throw err;
+      }
+
+      if (res.status === 204) {
+        return undefined as T;
+      }
+
+      if (!res.ok) {
+        let errorMessage = `ServiceClient: ${serviceKey} ${method} ${path} → ${res.status}`;
+        try {
+          const errBody = await res.json() as { error?: string };
+          if (errBody.error) errorMessage = errBody.error;
+        } catch (err) {
+          if (isAbortError(err)) throw timedOut();
+          /* sonst: Body kein JSON — Standardtext behalten */
+        }
+
+        // Nicht retrybar: 4xx Client-Fehler (die Antwort ist endgültig).
+        if (res.status >= 400 && res.status < 500) {
+          throw new ServiceClientError(errorMessage, serviceKey, res.status);
+        }
+
+        // 5xx: Retry
+        if (attempt <= this.retries) {
+          log('warn', 'ServiceClient: Retry nach Server-Fehler', {
+            serviceKey, method, path, status: res.status, attempt,
+          });
+          await new Promise((r) => setTimeout(r, this.retryDelay));
+          if (fetchOptions.signal?.aborted) throw timedOut();
+          continue;
+        }
+        throw new ServiceClientError(errorMessage, serviceKey, res.status);
+      }
+
+      try {
+        return await (res.json() as Promise<T>);
+      } catch (err) {
+        if (isAbortError(err)) throw timedOut();
         throw err;
       }
     }

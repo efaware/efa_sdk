@@ -24,3 +24,4 @@ export * from './serviceClient';
 export * from './serviceDiscovery';
 export * from './apiRegistry';
 export * from './i18n-backend';
+export * from './serviceProvenance';

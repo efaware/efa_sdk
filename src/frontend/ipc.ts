@@ -53,13 +53,20 @@ export function getParentOrigin(): string {
  * `window.opener` on the page can forge those messages — including CONVERGE_AUTH,
  * which carries the login token (session-fixation vector).
  *
- * Note: this stops sibling/opener injection. It does NOT by itself stop a
- * malicious *top-level* page from embedding the app and posting as the parent —
- * that is closed separately by a `frame-ancestors` CSP / X-Frame-Options on the
- * app's own responses (server/nginx layer), not here.
+ * Two checks: `event.source` must be the embedding frame, and `event.origin` must
+ * be the app's own origin (since 1.23) — the kernel embeds apps same-origin under
+ * `/apps/<key>/`. The origin check also stops a foreign top-level page that embeds
+ * the app on a directly reachable port and posts as its parent; `frame-ancestors`
+ * on the gateway covers the regular path as before.
  */
 export function isFromPlatformParent(event: MessageEvent): boolean {
-  return event.source === window.parent;
+  if (event.source !== window.parent) return false;
+  // Seit 1.23 zusätzlich die Origin (efa #286, Befund 4): der Kernel bettet Apps
+  // ausschließlich same-origin unter `/apps/<key>/` ein und schickt CONVERGE_AUTH
+  // nur an die eigene Origin. Eine Nachricht von einer anderen Origin stammt also
+  // nie vom Kernel — etwa wenn eine fremde Seite die App über einen direkt
+  // erreichbaren App-Port einbettet, wo `frame-ancestors` des Gateways nicht greift.
+  return event.origin === window.location.origin;
 }
 
 export function sendAtStart(): void {

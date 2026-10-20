@@ -15,7 +15,7 @@ import type { AuthRequest, SessionPayload } from '../src/backend/auth';
 import express from 'express';
 import request from 'supertest';
 
-const APP_SESSION_SECRET = 'test-app-session-secret';
+const APP_SESSION_SECRET = 'test-app-session-secret-0123456789abcdef';
 
 const { privateKey: rsaPrivateKey, publicKey: rsaPublicKey } = crypto.generateKeyPairSync('rsa', {
   modulusLength: 2048,

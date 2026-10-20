@@ -30,7 +30,7 @@ const ORIGINAL = {
 
 beforeAll(async () => {
   process.env.JWT_PUBLIC_KEY = keys.publicKeyB64;
-  process.env.APP_SESSION_SECRET = 'test-session-secret';
+  process.env.APP_SESSION_SECRET = 'test-session-secret-0123456789abcdef';
 
   db = await startTestDb();
   // Muss VOR dem Import von routes/auth stehen: der Router bekommt den Pool
