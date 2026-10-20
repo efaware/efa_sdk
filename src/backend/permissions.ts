@@ -45,6 +45,12 @@ export async function registerPermissions(
   serviceKey: string,
   permissions: AppPermission[],
   options?: {
+    /**
+     * @deprecated Seit 1.23 ohne Wirkung: der Legacy-Weg direkt an die
+     * Kernel-Registry (`/api/registry/services/:serviceKey/permissions`) ist
+     * entfernt (efa #287) — die Route antwortete seit der access-Faltung immer
+     * mit 500. Registriert wird nur über `CONVERGE_GATEWAY_URL`.
+     */
     registryBaseUrl?: string;
     retries?: number;
     retryDelayMs?: number;
@@ -53,22 +59,15 @@ export async function registerPermissions(
 ): Promise<void> {
   if (permissions.length === 0) return;
 
-  // Ziel: Permissions-App über den Gateway oder direkte URL
-  // Reihenfolge: CONVERGE_GATEWAY_URL (Gateway-Proxy), dann CONVERGE_REGISTRY_URL (Legacy)
+  // Ziel: converge_access (Kernel-Zugriff-Modul) über den Gateway. Den früheren
+  // Legacy-Weg direkt an die Registry gibt es seit 1.23 nicht mehr (die
+  // Kernel-Route antwortete seit der access-Faltung immer mit 500, efa #287).
   const gatewayUrl = (process.env.CONVERGE_GATEWAY_URL ?? '').replace(/\/$/, '');
-  const legacyUrl = (options?.registryBaseUrl ?? process.env.CONVERGE_REGISTRY_URL ?? '').replace(/\/$/, '');
-
-  let url: string;
-  if (gatewayUrl) {
-    // Über Gateway → converge-access (zentrale Zugriffsverwaltung)
-    url = `${gatewayUrl}/api/gateway/converge_access/api/internal/register`;
-  } else if (legacyUrl) {
-    // Legacy: direkt an Dashboard-Registry (Abwärtskompatibilität während Migration)
-    url = `${legacyUrl}/api/registry/services/${encodeURIComponent(serviceKey)}/permissions`;
-  } else {
-    log('warn', 'registerPermissions: Weder CONVERGE_GATEWAY_URL noch CONVERGE_REGISTRY_URL gesetzt – übersprungen');
+  if (!gatewayUrl) {
+    log('warn', 'registerPermissions: CONVERGE_GATEWAY_URL nicht gesetzt – übersprungen');
     return;
   }
+  const url = `${gatewayUrl}/api/gateway/converge_access/api/internal/register`;
 
   const maxRetries = options?.retries ?? 3;
   const retryDelay = options?.retryDelayMs ?? 5_000;

@@ -270,6 +270,10 @@ Needs a kernel with efaware/efa_kernel#106 and #107 first (gateway exchange toke
   argument (it would otherwise be ignored silently).
 - `serviceClient` no longer retries 4xx (`ServiceClientError` with `status`), new
   `call(…, body, { timeoutMs })`; permission lookups time out after 5 s.
+- `registerPermissions` no longer falls back to `CONVERGE_REGISTRY_URL` +
+  `/api/registry/services/:key/permissions` (that kernel route always answered 500 and is
+  removed in efaware/efa_kernel for efa #287); without `CONVERGE_GATEWAY_URL` it logs and
+  skips. `options.registryBaseUrl` is ignored.
 - `isFromPlatformParent` also checks `event.origin === window.location.origin`. The kernel
   embeds SDK apps same-origin under `/apps/<key>/`; an app embedded from a foreign origin
   no longer accepts platform messages.
