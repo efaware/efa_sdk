@@ -54,7 +54,7 @@ describe('registerAppInfo', () => {
   it('re-deklariert mit serviceKey bei CONVERGE_AUTH vom Parent', () => {
     const { parent, getHandler } = stubEmbeddedWindow();
     registerAppInfo({ appName: 'Converge Wetter', version: '1.2.3' });
-    getHandler()!({ source: parent, data: { type: 'CONVERGE_AUTH', serviceKey: 'converge_weather' } });
+    getHandler()!({ source: parent, origin: 'https://app.example', data: { type: 'CONVERGE_AUTH', serviceKey: 'converge_weather' } });
     expect(parent.postMessage).toHaveBeenCalledWith(
       {
         type: 'CONVERGE_DECLARE_APP_INFO',
@@ -68,6 +68,14 @@ describe('registerAppInfo', () => {
     const { parent, getHandler } = stubEmbeddedWindow();
     registerAppInfo({ appName: 'Converge Wetter', version: '1.2.3' });
     getHandler()!({ source: { fake: true }, data: { type: 'CONVERGE_AUTH', serviceKey: 'converge_weather' } });
+    expect(parent.postMessage).not.toHaveBeenCalled();
+  });
+
+  it('ignoriert Nachrichten vom Parent-Frame mit fremder Origin (efa #286)', () => {
+    const { parent, getHandler } = stubEmbeddedWindow();
+    registerAppInfo({ appName: 'Converge Wetter', version: '1.2.3' });
+    getHandler()!({ source: parent, origin: 'https://evil.example', data: { type: 'CONVERGE_AUTH', serviceKey: 'converge_weather' } });
+    getHandler()!({ source: parent, data: { type: 'CONVERGE_AUTH', serviceKey: 'converge_weather' } });
     expect(parent.postMessage).not.toHaveBeenCalled();
   });
 
@@ -109,7 +117,7 @@ describe('subscribeConvergeAuth', () => {
     };
     vi.stubGlobal('window', win);
     const auth = (extra: Record<string, unknown> = {}) =>
-      handler!({ source: parent, data: { type: 'CONVERGE_AUTH', token: 't1', serviceKey: 'converge_chat', ...extra } });
+      handler!({ source: parent, origin: 'https://kernel.example', data: { type: 'CONVERGE_AUTH', token: 't1', serviceKey: 'converge_chat', ...extra } });
     const requests = () =>
       parent.postMessage.mock.calls.filter(([m]: any[]) => m?.type === CONVERGE_AUTH_REQUEST).length;
     return { win, parent, auth, requests, getHandler: () => handler };
@@ -162,12 +170,22 @@ describe('subscribeConvergeAuth', () => {
     expect(onAuth).not.toHaveBeenCalled();
   });
 
+  it('ignoriert CONVERGE_AUTH vom Parent-Frame mit fremder Origin (efa #286)', async () => {
+    const onAuth = vi.fn(async () => true);
+    const { parent, getHandler } = stubEmbeddedWindow();
+    subscribeConvergeAuth({ onAuth });
+    getHandler()!({ source: parent, origin: 'https://evil.example', data: { type: 'CONVERGE_AUTH', token: 'evil' } });
+    getHandler()!({ source: parent, origin: 'null', data: { type: 'CONVERGE_AUTH', token: 'evil' } });
+    await flush();
+    expect(onAuth).not.toHaveBeenCalled();
+  });
+
   it('ignoriert CONVERGE_AUTH ohne Token', async () => {
     const onAuth = vi.fn(async () => true);
     const { parent, getHandler } = stubEmbeddedWindow();
     subscribeConvergeAuth({ onAuth });
-    getHandler()!({ source: parent, data: { type: 'CONVERGE_AUTH' } });
-    getHandler()!({ source: parent, data: { type: 'CONVERGE_AUTH', token: '' } });
+    getHandler()!({ source: parent, origin: 'https://kernel.example', data: { type: 'CONVERGE_AUTH' } });
+    getHandler()!({ source: parent, origin: 'https://kernel.example', data: { type: 'CONVERGE_AUTH', token: '' } });
     await flush();
     expect(onAuth).not.toHaveBeenCalled();
   });

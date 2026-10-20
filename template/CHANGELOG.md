@@ -6,6 +6,8 @@ All notable changes to this template will be documented here.
 
 ### Changed
 
+- **`.env.example` auf Produktionswerte (efa #290).** `ENVIRONMENT=production` (kein erreichbares `/dev/token` nach `cp .env.example .env`), `COOKIE_SECURE=true`, `CORS_ORIGINS` dokumentiert; die Dev-Werte stehen als Kommentar daneben. Neu: `APP_SESSION_SECRET_STRICT=true` (zu kurzes Secret bricht den Start ab) und der optionale `APP_SESSION_COOKIE_PATH`. `CLAUDE.md` und `docs/SECURITY.md` beschreiben Exchange-Vorfilter, Cookie-Pfad `/apps/<key>/`, `allowedCallers` und die Secret-Prüfung aus `@efa-one/sdk` 1.23. Der Test-Secret in `authExchange.test.ts` hat jetzt 32+ Byte.
+
 - **Oberste Berechtigung heißt `efa-all` (vormals `converge-admin`, efa #343, efaware/efa_kernel#98).** `App.tsx` blendet das Einstellungs-Zahnrad und die Route `/settings` für Inhaber von `efa-all` **oder** dem Alt-Key `converge-admin` ein — der Kernel liefert Apps bis Q1-2027 beide, ein Kernel vor v1.1.0 nur den Alt-Key. `requireAdmin`/`requireAdminOrPermission` aus dem SDK akzeptieren beide Keys ebenfalls. `CLAUDE.md`, `docs/ARCHITECTURE.md` und `docs/SECURITY.md` beschreiben `efa-all` und empfehlen `isPlatformAdmin()` aus `@efa-one/sdk/backend` bzw. `/frontend` statt eines String-Vergleichs. Sobald das Scaffold auf eine SDK-Version mit `isPlatformAdmin` zeigt, ersetzt der Helper die lokale Liste in `App.tsx`.
 
 ## [1.15.0] - 2026-10-19

@@ -243,6 +243,29 @@ exported for app-side use. CSV is CSV: Excel turns `01067` into `1067` and long 
 strings into `1,23E+18`, and shows the `'` in front of `+49 …` — point users to the
 Excel export for such data. No backend or kernel change.
 
+**Next minor (planned 1.23.0, not yet released) — exchange, cookie and S2S hardening.**
+Needs a kernel with efaware/efa_kernel#106 and #107 first (gateway exchange token
+`gw: 'app'`, provenance `jti`, cookie filter). Then:
+
+- `POST /api/auth/exchange` rejects tokens with `purpose` or `serviceKey` (delegation,
+  RAG, run-as), with a `gw` other than `'app'`, with `forcePasswordChange: true` and with a
+  tenant other than `default` (`classifyPlatformToken`). Against an older kernel the
+  gateway still exchanges the delegation token itself, so incoming MCP tool calls to the
+  app would fail — kernel first.
+- `app_session` lives on `/apps/<SERVICE_KEY>/` instead of `/` (`/` with
+  `ENVIRONMENT=development`, `APP_SESSION_COOKIE_PATH` overrides). The exchange deletes
+  a legacy cookie on `/` when the browser sends one.
+- `requireRegistryKey({ allowedCallers })`, `requireInternalOrAuth({ allowedCallers })`,
+  `requireInternalOrAdminOrPermission({ allowedCallers }, ...keys)`; the plain forms keep
+  working. `req.callerService` carries the verified caller. Provenance tokens older than
+  60 s are rejected, each `jti` is accepted once per app (in-memory, bounded); tokens
+  without `jti` (older kernel) still pass.
+- `APP_SESSION_SECRET`: missing or placeholder → `createExchangeRouter` throws at startup;
+  shorter than 32 bytes → warning (start abort with `APP_SESSION_SECRET_STRICT=true`).
+- `serviceClient` no longer retries 4xx (`ServiceClientError` with `status`), new
+  `call(…, body, { timeoutMs })`; permission lookups time out after 5 s.
+- `isFromPlatformParent` also checks `event.origin === window.location.origin`.
+
 ## License
 
 [Apache-2.0](./LICENSE) — permissive with a patent grant, so customers and partners

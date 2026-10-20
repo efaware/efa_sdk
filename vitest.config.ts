@@ -27,8 +27,12 @@ import { defineConfig } from 'vitest/config';
  * Config geprüft und bei einem toten Key hart abgebrochen.
  */
 const perFileThresholds = {
-  // Ratchet efa-Task #137 (Live-Sitzungsprüfung): Ist L 80.8 / S 79.2 / F 80.6 / B 75.9.
-  'src/backend/auth.ts': { lines: 79, statements: 78, functions: 79, branches: 74 },
+  // Ratchet SDK-Bündel Q4-2026 (efa #282/#286/#287/#290): Ist L 93.2 / S 92.6 / F 93.5 / B 90.6.
+  'src/backend/auth.ts': { lines: 92, statements: 91, functions: 92, branches: 89 },
+  // Provenance-Prüfung (Aufrufer, Alter, Einmaligkeit): Ist L 98.5 / S 94.7 / F 100 / B 89.1.
+  'src/backend/serviceProvenance.ts': { lines: 98, statements: 94, functions: 100, branches: 88 },
+  // Kein Retry bei 4xx, Timeout: Ist L 94.9 / S 89.7 / F 100 / B 84.2.
+  'src/backend/serviceClient.ts': { lines: 94, statements: 89, functions: 100, branches: 83 },
   // Sicherheitskritisch (efa-Task #137): entscheidet, ob eine entwertete
   // Kernel-Sitzung in der App noch durchkommt. Ist: 100 % in allen vier.
   'src/backend/sessionStatusClient.ts': { lines: 100, statements: 100, functions: 100, branches: 95 },
