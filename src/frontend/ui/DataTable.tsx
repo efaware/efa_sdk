@@ -727,7 +727,11 @@ export function DataTable<T, K extends string | number>({
             className="text-xs underline text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             onClick={() => selection.onChange(new Set())}
           >
-            Auswahl löschen
+            {/* „aufheben“, nicht „löschen“: der Knopf leert nur die Markierung.
+                Apps legen daneben oft eine echte Lösch-Aktion „Auswahl löschen“
+                in `bulkActions` — zwei gleich beschriftete Knöpfe mit
+                gegensätzlicher Wirkung (efa #348). */}
+            Auswahl aufheben
           </button>
           <div className="flex-1" />
           {selection.bulkActions}

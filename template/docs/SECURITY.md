@@ -59,7 +59,7 @@ HTTP request → requireAuth (decode app_session) → permission middleware
                                                                │
                                                                └─► GET converge_access
                                                                      /api/internal/users/:id/permissions
-                                                                     → { keys: ["myapp.default", "converge-admin", ...] }
+                                                                     → { keys: ["myapp.default", "efa-all", ...] }
 ```
 
 - The list of effective keys joins the user's roles (from `converge_zbv`) with the permission objects each role carries (from `converge_access`).
@@ -70,7 +70,7 @@ HTTP request → requireAuth (decode app_session) → permission middleware
 
 - `{service_key}.default` – tile visibility / basic usage (auto-created per tile — the only key the kernel creates itself)
 - `{service_key}.<custom>` – every additional permission, including an app-level `{service_key}.admin`, registered by the app via `registerPermissions()` at startup. Keys the app stops reporting are removed (except `.default`).
-- `converge-admin` – platform-wide admin, **treated as a regular permission key** (no separate `role` field, no special JWT claim)
+- `efa-all` – platform-wide admin (formerly `converge-admin`), **treated as a regular permission key** (no separate `role` field, no special JWT claim). Only holders of `efa-all` can see, grant or revoke it in the kernel. Until Q1-2027 the kernel also returns the legacy key `converge-admin` to apps; check with `isPlatformAdmin()` from `@efa-one/sdk/backend` / `/frontend`, never against the string.
 
 ### Route-level guards (backend)
 
@@ -93,15 +93,19 @@ router.delete('/items/:id', requireAdminOrPermission('myapp.admin'), handler);
 router.get('/items',        requireAdminOrPermission('myapp.default', 'myapp.admin'), handler);
 ```
 
-`requireAdminOrPermission(...keys)` lets the request through if `converge-admin` **or** any of the listed app permission keys is in the live lookup result. Each middleware does its own lookup; you do not call `getUserPermissions()` manually.
+`requireAdminOrPermission(...keys)` lets the request through if `efa-all` (or, during the transition, `converge-admin`) **or** any of the listed app permission keys is in the live lookup result. Each middleware does its own lookup; you do not call `getUserPermissions()` manually.
 
 ### Permission checks (frontend)
 
 `useConvergeAuth()` loads permissions immediately after the token exchange via `GET /api/auth/permissions` (which the backend serves by calling `getUserPermissions()` under the hood). They live as `user.permissions: string[]` on the `AppUser`:
 
 ```ts
+// requires an @efa-one/sdk release after 1.22.0 (proposed 1.23.0); older SDKs:
+// compare against ['efa-all', 'converge-admin'] as App.tsx does.
+import { isPlatformAdmin } from '@efa-one/sdk/frontend';
+
 const { user } = useConvergeAuth();
-const isAdmin   = user?.permissions?.includes('converge-admin') ?? false;
+const isAdmin   = isPlatformAdmin(user?.permissions);   // efa-all (+ legacy converge-admin)
 const canExport = user?.permissions?.includes('myapp.can-export') ?? false;
 ```
 

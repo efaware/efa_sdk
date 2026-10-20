@@ -18,6 +18,7 @@ export * from './permissions';
 export * from './permissionClient';
 export * from './sessionStatusClient';
 export * from './permissionCheck';
+export * from './platformAdmin';
 export * from './customPermissions';
 export * from './serviceClient';
 export * from './serviceDiscovery';

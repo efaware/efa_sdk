@@ -13,7 +13,7 @@
 # Eigenes), und ein Dependency-PR gegen einen toten Branch wird nie gemergt. PRs gehen
 # also gegen `main` und werden dort durch build-check.yml + security.yml abgesichert.
 #
-# Grouping: alle minor/patch-Updates pro Verzeichnis in EINEN PR → 1 PR/Woche statt vieler.
+# Grouping: alle minor/patch-Updates pro Verzeichnis in EINEN PR → 1 PR/Monat statt vieler.
 # Major-Updates kommen als EINZELNE PRs (bewusste manuelle Review) — mit einer Ausnahme:
 # die ESLint-Familie muss gemeinsam springen (siehe Kommentar beim eslint-Major-Block).
 #
@@ -30,16 +30,17 @@
 # Updates aus Dependabot-Alerts laufen bewusst ungebremst durch — ein CVE-Fix
 # soll sofort kommen.
 #
-# Zeitplan-Policy (plattformweit, ci/README.md): npm weekly, docker +
-# github-actions monthly — die beiden bewegen sich langsam und erzeugen
-# woechentlich vor allem Rauschen, das die npm-PRs zudeckt.
+# Zeitplan-Policy (plattformweit, ci/README.md): alles monthly — npm seit
+# 10/2026 auch (Actions-Minuten der privaten Repos; hier im öffentlichen Repo
+# kostenlos, die Policy gilt trotzdem einheitlich). Security-Updates aus
+# Dependabot-Alerts kommen davon unabhängig sofort.
 version: 2
 updates:
   # --- npm: das SDK selbst ---
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
       semver-patch-days: 7
@@ -112,7 +113,7 @@ updates:
   - package-ecosystem: npm
     directory: /template/backend
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
       semver-patch-days: 7
@@ -140,7 +141,7 @@ updates:
   - package-ecosystem: npm
     directory: /template/frontend
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
       semver-patch-days: 7

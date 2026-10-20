@@ -3,7 +3,8 @@ import React from 'react';
 /**
  * SettingsPage – admin-only placeholder for app-specific settings.
  *
- * Only reachable for users with the converge-admin permission (enforced in App.tsx routing).
+ * Only reachable for platform admins — permission `efa-all` (legacy `converge-admin`
+ * until Q1-2027) — enforced in App.tsx routing.
  * Add your app-specific settings here.
  */
 export default function SettingsPage() {

@@ -1183,10 +1183,17 @@ hält sie als `user.permissions[]` im State. Apps können sie direkt lesen — d
 Hook kümmert sich um die Synchronisation.
 
 ```ts
+// isPlatformAdmin gibt es ab dem SDK-Release nach 1.22.0 (vorgeschlagen 1.23.0);
+// davor wie in App.tsx gegen ['efa-all', 'converge-admin'] prüfen.
+import { isPlatformAdmin } from '@efa-one/sdk/frontend';
+
 const { user } = useConvergeAuth();
 
-// Admin (efa-one-weit) ist eine Permission wie jede andere:
-const isAdmin = user?.permissions?.includes('converge-admin') ?? false;
+// Admin (efa-one-weit) ist eine Permission wie jede andere — `efa-all`.
+// Nie direkt auf den String prüfen: bis Q1-2027 liefert der Kernel zusätzlich
+// den Alt-Key `converge-admin` (ältere Kernel NUR diesen); `isPlatformAdmin`
+// kennt beide.
+const isAdmin = isPlatformAdmin(user?.permissions);
 
 // App-spezifische Permission:
 const canExport = user?.permissions?.includes('myapp.can-export') ?? false;
@@ -1200,11 +1207,11 @@ Für noch frischere Sichtbarkeits-Checks (z.B. nach einer Rollen-Änderung) kann
 ```ts
 import { requireAdminOrPermission, requirePermission, requireAdmin } from '../middleware/auth';
 
-// Standard: Admin (converge-admin) ODER eine der angegebenen App-Permissions:
+// Standard: Admin (efa-all) ODER eine der angegebenen App-Permissions:
 router.delete('/:id', requireAdminOrPermission('myapp.admin'), handler);
 router.get('/items', requireAdminOrPermission('myapp.read', 'myapp.admin'), handler);
 // myapp.read / myapp.admin existieren nur, wenn die App sie per registerPermissions() meldet —
-// sonst kommt hier ausschließlich converge-admin durch.
+// sonst kommt hier ausschließlich efa-all durch.
 
 // Reine App-Permission (ohne Admin-Bypass, selten):
 router.get('/export', requirePermission('myapp.can-export'), handler);
@@ -1224,8 +1231,8 @@ JWT-Caching.
 | User hat Rolle mit `app.default` | Kachel sichtbar, `app.default` ist im Live-Lookup-Result |
 | User hat Rollen mit `app.default` + `app.admin` (von der App registriert) | Beide Keys werden zurückgegeben |
 | User hat keine Rolle mit `app.*` | Kachel unsichtbar |
-| User hat Permission `converge-admin` | Sieht alle Kacheln; alle `requireAdminOrPermission` lassen ihn durch |
-| Kachel hat kein Berechtigungsobjekt (Altdaten) | Nur für Inhaber von `converge-admin` sichtbar |
+| User hat Permission `efa-all` (bis Q1-2027 auch Alt-Key `converge-admin`) | Sieht alle Kacheln; `requireAdmin` und alle `requireAdminOrPermission` lassen ihn durch |
+| Kachel hat kein Berechtigungsobjekt (Altdaten) | Nur für Inhaber von `efa-all` sichtbar |
 
 ## efa-one IPC – Navigation
 
