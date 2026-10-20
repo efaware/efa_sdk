@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import express from 'express';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const cookieParser = require('cookie-parser');
+import { readCookies } from './helpers-cookies';
 import request from 'supertest';
 import { resetProvenanceReplayCache } from '../src/backend/serviceProvenance';
 import {
@@ -56,7 +55,7 @@ function platformToken(claims: Record<string, unknown> = {}): string {
 function app() {
   const a = express();
   a.use(express.json());
-  a.use(cookieParser());
+  a.use(readCookies);
   a.use('/api/auth', createExchangeRouter({ query: vi.fn().mockResolvedValue({ rows: [{ id: 'app-user-1' }] }) } as never));
   return a;
 }
@@ -145,7 +144,7 @@ describe('POST /exchange with the pre-filter', () => {
     const pool = { query: vi.fn() };
     const a = express();
     a.use(express.json());
-    a.use(cookieParser());
+    a.use(readCookies);
     a.use('/api/auth', createExchangeRouter(pool as never));
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 

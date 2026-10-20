@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import express from 'express';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const cookieParser = require('cookie-parser');
+import { readCookies } from './helpers-cookies';
 import request from 'supertest';
 import type { Response } from 'express';
 import {
@@ -252,7 +251,7 @@ describe('requireInternalOrAuth', () => {
 
   it('with allowedCallers: a foreign caller WITH a delegated user session passes as that user', async () => {
     const app = express();
-    app.use(cookieParser());
+    app.use(readCookies);
     app.get('/x', requireInternalOrAuth({ allowedCallers: ['converge_chat'] }), (q, s) => {
       const r = q as AuthRequest;
       s.json({ caller: r.callerService ?? null, user: r.user?.convergeId ?? null });
