@@ -15,7 +15,7 @@ const mockUser = {
   lastSeenAt: null,
 };
 
-const mockPermissions = ['myapp.default', 'converge-admin'];
+const mockPermissions = ['myapp.default', 'efa-all'];
 
 function mockExchangeAndPermissions() {
   fetchMock.mockResolvedValueOnce({

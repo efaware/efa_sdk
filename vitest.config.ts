@@ -32,6 +32,10 @@ const perFileThresholds = {
   // Sicherheitskritisch (efa-Task #137): entscheidet, ob eine entwertete
   // Kernel-Sitzung in der App noch durchkommt. Ist: 100 % in allen vier.
   'src/backend/sessionStatusClient.ts': { lines: 100, statements: 100, functions: 100, branches: 95 },
+  // Oberste Berechtigung efa-all (+ Alt-Key converge-admin bis Q1-2027): entscheidet
+  // in jeder App über den Admin-Zugang. Ist: 100 % in allen vier.
+  'src/backend/platformAdmin.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
+  'src/frontend/platformAdmin.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
   'src/backend/health.ts': { lines: 100, statements: 100, functions: 100, branches: 50 },
   // Ratchet Auth-Handshake (CONVERGE_AUTH_REQUEST): Ist L 87.8 / S 85.1 / F 76 / B 80.4.
   'src/frontend/ipc.ts': { lines: 87, statements: 84, functions: 75, branches: 79 },
