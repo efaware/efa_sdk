@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import * as backend from '../src/backend/platformAdmin';
 import * as frontend from '../src/frontend/platformAdmin';
 import * as backendBarrel from '../src/backend/index';
@@ -42,5 +44,22 @@ describe('barrel export', () => {
   it('exposes the helper via @efa-one/sdk/backend', () => {
     expect(backendBarrel.isPlatformAdmin).toBe(backend.isPlatformAdmin);
     expect(backendBarrel.PLATFORM_ADMIN_PERMISSIONS).toBe(backend.PLATFORM_ADMIN_PERMISSIONS);
+  });
+});
+
+describe('scaffold parity', () => {
+  // template/frontend/src/App.tsx führt die Liste lokal, solange das Scaffold auf
+  // ein SDK ohne isPlatformAdmin zeigt. Beim Wegfall des Alt-Keys (Q1-2027) darf
+  // keine der drei Kopien zurückbleiben.
+  it('template App.tsx lists exactly the SDK keys', () => {
+    const app = readFileSync(resolve(process.cwd(), 'template/frontend/src/App.tsx'), 'utf8');
+    const m = app.match(/const PLATFORM_ADMIN_PERMISSIONS = \[([^\]]*)\]/);
+    if (m) {
+      const keys = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+      expect(keys).toEqual([...backend.PLATFORM_ADMIN_PERMISSIONS]);
+    } else {
+      // Liste entfernt → dann muss App.tsx den SDK-Helper nutzen.
+      expect(app).toContain('isPlatformAdmin(');
+    }
   });
 });

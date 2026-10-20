@@ -1183,6 +1183,8 @@ hält sie als `user.permissions[]` im State. Apps können sie direkt lesen — d
 Hook kümmert sich um die Synchronisation.
 
 ```ts
+// isPlatformAdmin gibt es ab dem SDK-Release nach 1.22.0 (vorgeschlagen 1.23.0);
+// davor wie in App.tsx gegen ['efa-all', 'converge-admin'] prüfen.
 import { isPlatformAdmin } from '@efa-one/sdk/frontend';
 
 const { user } = useConvergeAuth();

@@ -100,6 +100,8 @@ router.get('/items',        requireAdminOrPermission('myapp.default', 'myapp.adm
 `useConvergeAuth()` loads permissions immediately after the token exchange via `GET /api/auth/permissions` (which the backend serves by calling `getUserPermissions()` under the hood). They live as `user.permissions: string[]` on the `AppUser`:
 
 ```ts
+// requires an @efa-one/sdk release after 1.22.0 (proposed 1.23.0); older SDKs:
+// compare against ['efa-all', 'converge-admin'] as App.tsx does.
 import { isPlatformAdmin } from '@efa-one/sdk/frontend';
 
 const { user } = useConvergeAuth();

@@ -186,6 +186,8 @@ interface AppUser {
   // ...
 }
 
+// requires an @efa-one/sdk release after 1.22.0 (proposed 1.23.0); older SDKs:
+// compare against ['efa-all', 'converge-admin'] as App.tsx does.
 import { isPlatformAdmin } from '@efa-one/sdk/frontend';
 
 const { user } = useConvergeAuth();

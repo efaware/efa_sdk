@@ -297,7 +297,8 @@ export function requireInternalOrAuth(req: AuthRequest, res: Response, next: Nex
 
 /**
  * requireInternalOrAdminOrPermission – akzeptiert ein Gateway-Provenance-Token,
- * Converge-Admin oder eine der angegebenen App-Permissions. Live-Lookup für die
+ * einen Plattform-Admin (`efa-all`, im Übergang auch `converge-admin`) oder eine
+ * der angegebenen App-Permissions. Live-Lookup für die
  * User-Variante.
  */
 export function requireInternalOrAdminOrPermission(...permissionKeys: string[]) {
