@@ -243,6 +243,25 @@ exported for app-side use. CSV is CSV: Excel turns `01067` into `1067` and long 
 strings into `1,23E+18`, and shows the `'` in front of `+49 …` — point users to the
 Excel export for such data. No backend or kernel change.
 
+**1.23.0 — Q4-2026 security bundle, `efa-all`.** Needs **Kernel ≥ v1.1.0**.
+- `efa-all` is the top permission (was `converge-admin`). `isPlatformAdmin(keys)`,
+  `PLATFORM_ADMIN_PERMISSION(S)` and the admin guards accept `efa-all` **or**
+  `converge-admin` until Q1-2027.
+- Exchange rejects purpose-bound tokens (`purpose`/`serviceKey`), `gw` other than
+  `'app'`, `forcePasswordChange` and `tenant !== 'default'` (`classifyPlatformToken`);
+  `gw: 'app'` only with gateway provenance for this app.
+- In production (`NODE_ENV=production`) `app_session` lives on `/apps/<SERVICE_KEY>/`
+  instead of `/`; the exchange removes an old `/` cookie unless the name is the generic
+  `app_session`. Apps still on the generic name set `APP_SESSION_COOKIE_NAME=<key>_app_session`.
+- `requireRegistryKey`/`requireInternalOrAuth`/`requireInternalOrAdminOrPermission` take
+  `{ allowedCallers }`, set `req.callerService`, accept provenance tokens for 60 s and only
+  once (`jti`).
+- `APP_SESSION_SECRET` missing or a placeholder aborts the start in production, shorter
+  than 32 bytes warns (`APP_SESSION_SECRET_STRICT=true` aborts).
+- `serviceClient` no longer retries 4xx (`ServiceClientError`), has `timeoutMs`;
+  permission lookups time out after 5 s. `isFromPlatformParent` also checks `event.origin`.
+- Peer range `i18next-http-backend >=4.0.2`; DataTable bulk bar says „Auswahl aufheben".
+
 **Next minor (planned 1.23.0, not yet released) — exchange, cookie and S2S hardening.**
 Needs a kernel with efaware/efa_kernel#106 and #107 first (gateway exchange token
 `gw: 'app'`, provenance `jti`, cookie filter). Then:
