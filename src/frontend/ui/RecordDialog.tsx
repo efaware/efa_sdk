@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Pencil } from 'lucide-react';
-import { Dialog, DialogClose } from './Dialog.js';
+import { Dialog, DialogClose, type DialogSize } from './Dialog.js';
 import { Button } from './Button.js';
 import { Alert } from './Alert.js';
 
@@ -55,6 +55,9 @@ interface RecordDialogProps {
   /** Wenn gesetzt, bekommt das Fehler-Banner ein „×" zum manuellen Schließen. */
   onErrorDismiss?: () => void;
 
+  /** Maximale Breite, wie beim `Dialog`. Ohne Angabe 768 px (`3xl`). */
+  size?: DialogSize;
+
   /** Custom-Labels für Footer-Buttons (Default: Schließen / Abbrechen / Speichern / Erstellen). */
   labels?: {
     close?: string;
@@ -84,6 +87,7 @@ export function RecordDialog({
   title, readContent, editContent,
   onSave, saving, saveDisabled,
   error, onErrorDismiss,
+  size,
   labels,
 }: RecordDialogProps) {
   const [internalMode, setInternalMode] = useState<RecordDialogMode>('read');
@@ -123,6 +127,7 @@ export function RecordDialog({
       open={open !== null}
       onOpenChange={(o) => { if (!o) handleClose(); }}
       title={title}
+      size={size}
       // Banner-Slot statt Body: der Dialog-Body scrollt, ein Fehler dort würde
       // bei langen Formularen aus dem Blick rutschen — genau dann, wenn der
       // Nutzer unten auf „Speichern" drückt.

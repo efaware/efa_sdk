@@ -585,8 +585,8 @@ Bestands-Apps auf Tailwind v3 tragen den Pfad stattdessen in `content` der
 | `Button` | All buttons — variants: `primary`, `secondary`, `danger`, `ghost`. Pass `loading` for spinner. |
 | `Badge` | Status labels — variants: `success`, `warning`, `danger`, `neutral`. |
 | `Alert` | Fehler-/Status-**Banner** in Formularen/Dialogen — variants: `error`, `success`, `warning`, `info`; `onDismiss` für „×". Nie handgerollt (Kontrast-Falle, siehe Regel unten). |
-| `Dialog` | Confirmations, forms in modal. Always use for destructive actions. Breite über `size` (`sm`…`5xl`, Default `md`) — nicht per `className` überschreiben. **Höhe** ist auf `90vh` gedeckelt: der Body scrollt, Header und Footer stehen fest — Formulare dürfen also beliebig lang werden, der Speichern-Button bleibt erreichbar. Ein Banner, das beim Scrollen sichtbar bleiben muss (Fehler/Validierung), gehört in den `banner`-Slot, **nicht** in `children`. |
-| `RecordDialog` | **Pflicht** für Detail-Ansichten von Listen-Einträgen (siehe „Detail-Dialog-Pattern" weiter unten). |
+| `Dialog` | Confirmations, forms in modal. Always use for destructive actions. Breite über `size` (`sm`…`5xl`, Default `3xl` = 768 px, seit SDK 1.24) — nicht per `className` überschreiben. Kurze Bestätigungen („Wirklich löschen?“) mit `size="sm"`, sonst stehen zwei Zeilen Text in einem 768 px breiten Kasten. **Höhe** ist auf `90vh` gedeckelt: der Body scrollt, Header und Footer stehen fest — Formulare dürfen also beliebig lang werden, der Speichern-Button bleibt erreichbar. Ein Banner, das beim Scrollen sichtbar bleiben muss (Fehler/Validierung), gehört in den `banner`-Slot, **nicht** in `children`. |
+| `RecordDialog` | **Pflicht** für Detail-Ansichten von Listen-Einträgen (siehe „Detail-Dialog-Pattern" weiter unten). Breite wie beim `Dialog` über `size` (Default 768 px). |
 | `DropdownMenu` | Context menus, "more" menus (MoreHorizontal icon). |
 | `Tooltip` | Hints on icon-only buttons. |
 | `EmptyState` | Every list/table that can have zero items. |
