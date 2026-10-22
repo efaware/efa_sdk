@@ -17,16 +17,33 @@ interface DialogProps {
    */
   banner?: React.ReactNode;
   footer?: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
+  /** Maximale Breite. Ohne Angabe 768 px (`3xl`); kurze Bestätigungen mit `sm`. */
+  size?: DialogSize;
 }
 
-const SIZE_CLASS: Record<NonNullable<DialogProps['size']>, string> = {
+export type DialogSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
+
+/**
+ * Vorgabe 768 px (efa #364). Bis 1.23 war es `md` (448 px): zu schmal für fast
+ * jedes Formular, die Apps mussten fast überall selbst `size` setzen.
+ */
+export const DEFAULT_DIALOG_SIZE: DialogSize = '3xl';
+
+const SIZE_CLASS: Record<DialogSize, string> = {
   sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg',
   xl: 'max-w-xl', '2xl': 'max-w-2xl', '3xl': 'max-w-3xl',
   '4xl': 'max-w-4xl', '5xl': 'max-w-5xl',
 };
 
-export function Dialog({ open, onOpenChange, trigger, title, description, children, banner, footer, size = 'md' }: DialogProps) {
+/**
+ * Breiten-Klassen des Dialogs. Auf schmalen Bildschirmen volle Breite minus
+ * 1 rem Rand je Seite, damit der Dialog nicht an den Fensterrand stößt.
+ */
+export function dialogWidthClass(size: DialogSize = DEFAULT_DIALOG_SIZE): string {
+  return `w-[calc(100%-2rem)] ${SIZE_CLASS[size]}`;
+}
+
+export function Dialog({ open, onOpenChange, trigger, title, description, children, banner, footer, size = DEFAULT_DIALOG_SIZE }: DialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       {trigger && <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger>}
@@ -52,7 +69,7 @@ export function Dialog({ open, onOpenChange, trigger, title, description, childr
           Inhaltshöhe überhaupt möglich).
         */}
         <RadixDialog.Content
-          className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full ${SIZE_CLASS[size]} flex flex-col max-h-[90vh] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95`}
+          className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 ${dialogWidthClass(size)} flex flex-col max-h-[90vh] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95`}
         >
           {/* Header */}
           <div className="shrink-0 flex items-start justify-between p-5 border-b border-[var(--color-border)]">

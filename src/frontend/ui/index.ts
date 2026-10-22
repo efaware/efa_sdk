@@ -15,7 +15,7 @@ export { Button } from './Button.js';
 export { Input } from './Input.js';
 export { Badge } from './Badge.js';
 export { Alert, type AlertVariant } from './Alert.js';
-export { Dialog, DialogClose } from './Dialog.js';
+export { Dialog, DialogClose, DEFAULT_DIALOG_SIZE, type DialogSize } from './Dialog.js';
 export * as DropdownMenu from './DropdownMenu.js';
 export { Tooltip, TooltipProvider } from './Tooltip.js';
 export { EmptyState } from './EmptyState.js';
