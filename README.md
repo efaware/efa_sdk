@@ -262,6 +262,13 @@ Excel export for such data. No backend or kernel change.
   permission lookups time out after 5 s. `isFromPlatformParent` also checks `event.origin`.
 - Peer range `i18next-http-backend >=4.0.2`; DataTable bulk bar says „Auswahl aufheben".
 
+**1.24.0 — wider dialogs.** No kernel or backend change.
+- `Dialog` defaults to `size="3xl"` (768 px) instead of `md` (448 px), exported as
+  `DEFAULT_DIALOG_SIZE`; on small screens it keeps 1 rem margin on each side.
+- `RecordDialog` takes `size` and uses the same default.
+- After the bump every dialog without `size` is 768 px wide. Give short confirmations
+  ("Wirklich löschen?") `size="sm"`.
+
 **Next minor (planned 1.23.0, not yet released) — exchange, cookie and S2S hardening.**
 Needs a kernel with efaware/efa_kernel#106 and #107 first (gateway exchange token
 `gw: 'app'`, provenance `jti`, cookie filter). Then:
