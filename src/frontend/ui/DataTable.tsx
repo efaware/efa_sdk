@@ -36,7 +36,9 @@
  * und Filtern laufen dort über das Zahnrad bzw. die seiteneigene Filter-Leiste.
  * Der Desktop-Zweig bleibt unverändert; zusätzlich fängt ein
  * `overflow-x-auto`-Container schmale Fenster ab, damit ein zu breites Grid in
- * sich scrollt statt das ganze Dokument seitwärts zu kippen.
+ * sich scrollt statt das ganze Dokument seitwärts zu kippen. Ist das Grid breiter
+ * als der Container, steht eine zweite Scrollleiste über der Tabelle (synchron zur
+ * unteren) — bei langen Listen liegt die untere sonst außerhalb des Bildschirms.
  *
  * Die Komponente erwartet die Converge-Design-Tokens (`--color-*`,
  * `--border-radius-*`) im DOM und (für innen genutzte Klassen keine, aber ihre
@@ -487,6 +489,8 @@ export function DataTable<T, K extends string | number>({
   // Während des Breiten-Ziehens wird das Grid-Template direkt an diesem
   // Container (CSS-Variable) gesetzt — sonst rendert jede Mausbewegung alle Zeilen.
   const containerRef = useRef<HTMLDivElement>(null);
+  // Kopfzeile: ihre Breite (`min-w-min`) ist die Grid-Breite → Maß für die obere Scrollleiste.
+  const headerRef = useRef<HTMLDivElement>(null);
 
   // Nachträglich ergänzte Spalten in eine evtl. gespeicherte Ansicht einsortieren.
   const effectiveOrder = useMemo(() => reconcileOrder(columns, prefs.columnOrder), [columns, prefs.columnOrder]);
@@ -708,11 +712,14 @@ export function DataTable<T, K extends string | number>({
   );
 
   return (
-    // overflow-x-auto: ein zu breites Grid scrollt IN SICH statt das ganze
-    // Dokument seitwärts zu kippen (zusammen mit `min-w-min` an den Grid-Zeilen).
+    <div className="border border-[var(--color-border)]">
+    {/* Obere Scrollleiste: Spiegel der unteren, nur wenn das Grid überbreit ist. */}
+    <TopScrollbar targetRef={containerRef} measureRef={headerRef} enabled={!isMobile} />
+    {/* overflow-x-auto: ein zu breites Grid scrollt IN SICH statt das ganze
+        Dokument seitwärts zu kippen (zusammen mit `min-w-min` an den Grid-Zeilen). */}
     <div
       ref={containerRef}
-      className="border border-[var(--color-border)] overflow-x-auto"
+      className="overflow-x-auto"
       style={{ '--dt-cols': gridTemplate } as React.CSSProperties}
     >
       {/* Bulk-Bar */}
@@ -764,6 +771,7 @@ export function DataTable<T, K extends string | number>({
       ) : (
         /* Header (Desktop) */
         <div
+          ref={headerRef}
           className="grid items-center min-w-min px-3 py-2 text-xs font-medium border-b border-[var(--color-border)]"
           style={{ gridTemplateColumns: 'var(--dt-cols)', background: 'var(--color-surface-raised)' }}
         >
@@ -980,6 +988,72 @@ export function DataTable<T, K extends string | number>({
           {footer}
         </div>
       )}
+    </div>
+    </div>
+  );
+}
+
+/**
+ * Breite der oberen Scrollleiste: die Grid-Breite, wenn sie den sichtbaren Bereich
+ * übersteigt, sonst `null` (keine Leiste). 1 px Toleranz gegen Rundung bei Zoom.
+ */
+export function topScrollbarWidth(gridWidth: number, viewportWidth: number): number | null {
+  return gridWidth > viewportWidth + 1 ? gridWidth : null;
+}
+
+/**
+ * Zweite horizontale Scrollleiste über der Tabelle, synchron zur unteren des
+ * Containers. Die Breite kommt von `measureRef` (Kopfzeile, `min-w-min` = Grid-Breite)
+ * per ResizeObserver — so wächst sie auch beim Ziehen einer Spaltenbreite mit, das
+ * ohne React-Render nur die CSS-Variable `--dt-cols` setzt.
+ */
+function TopScrollbar({ targetRef, measureRef, enabled }: {
+  targetRef: React.RefObject<HTMLDivElement | null>;
+  measureRef: React.RefObject<HTMLDivElement | null>;
+  enabled: boolean;
+}): React.ReactElement | null {
+  const barRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    const target = targetRef.current;
+    const measured = measureRef.current;
+    if (!enabled || !target || !measured || typeof ResizeObserver === 'undefined') {
+      setWidth(null);
+      return;
+    }
+    const update = (): void => setWidth(topScrollbarWidth(target.scrollWidth, target.clientWidth));
+    const observer = new ResizeObserver(update);
+    observer.observe(target);
+    observer.observe(measured);
+    update();
+    const follow = (): void => {
+      if (barRef.current) barRef.current.scrollLeft = target.scrollLeft;
+    };
+    target.addEventListener('scroll', follow, { passive: true });
+    return () => {
+      observer.disconnect();
+      target.removeEventListener('scroll', follow);
+    };
+  }, [enabled, targetRef, measureRef]);
+
+  // Erscheint die Leiste bei bereits gescrollter Tabelle, gleich auf dieselbe Position.
+  useEffect(() => {
+    if (barRef.current && targetRef.current) barRef.current.scrollLeft = targetRef.current.scrollLeft;
+  }, [width, targetRef]);
+
+  if (width == null) return null;
+  return (
+    <div
+      ref={barRef}
+      aria-hidden="true"
+      tabIndex={-1}
+      className="overflow-x-auto overflow-y-hidden"
+      onScroll={() => {
+        if (targetRef.current && barRef.current) targetRef.current.scrollLeft = barRef.current.scrollLeft;
+      }}
+    >
+      <div style={{ width, height: 1 }} />
     </div>
   );
 }
