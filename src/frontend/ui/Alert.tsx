@@ -11,7 +11,13 @@ interface AlertProps {
   /**
    * Gesteuertes Schließen: Das „×" ruft diesen Callback, der Aufrufer blendet das
    * Banner aus (z. B. `setError('')`). Ohne `onDismiss` blendet sich das Banner
-   * selbst aus und erscheint wieder, sobald sich ein Text-Inhalt ändert.
+   * selbst aus und erscheint erst wieder, wenn sich ein Text-Inhalt ändert oder
+   * es neu eingehängt wird.
+   *
+   * Meldungen aus App-State (Fehler, Ergebnisse) IMMER mit `onDismiss`: Setzt die
+   * App nach dem Schließen denselben Text erneut (z. B. `setError('')` und
+   * `setError(text)` im selben Handler) oder ist der Inhalt JSX, bleibt ein
+   * selbst geschlossenes Banner sonst verborgen. Ohne `onDismiss` nur für feste Hinweise.
    */
   onDismiss?: () => void;
   /**
