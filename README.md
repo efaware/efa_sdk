@@ -269,6 +269,18 @@ Excel export for such data. No backend or kernel change.
 - After the bump every dialog without `size` is 768 px wide. Give short confirmations
   ("Wirklich löschen?") `size="sm"`.
 
+**1.25.0 — dismissible banners, top scrollbar.** No kernel or backend change.
+- Every `Alert` shows a close „×" top right by default. With `onDismiss` nothing
+  changes. Without it the banner hides itself and shows again when its text changes.
+  `dismissible={false}` removes the „×" for notices that must stay.
+- Messages from app state (errors, results) need `onDismiss`: without it, a closed
+  banner stays hidden when the app sets the same text again in one handler or when
+  the content is JSX. After the bump, add `onDismiss` (and `onErrorDismiss` on
+  `RecordDialog`) wherever such banners lack it.
+- `DataTable`: when the grid is wider than its container, a second horizontal
+  scrollbar sits above the table and scrolls in sync with the bottom one. Not on
+  mobile. The border moved to an outer wrapper.
+
 **Next minor (planned 1.23.0, not yet released) — exchange, cookie and S2S hardening.**
 Needs a kernel with efaware/efa_kernel#106 and #107 first (gateway exchange token
 `gw: 'app'`, provenance `jti`, cookie filter). Then:
