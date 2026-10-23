@@ -32,7 +32,8 @@ describe('DataTable – obere Scrollleiste', () => {
         rowKey: (r: Row) => r.id,
       }),
     );
-    expect(html).not.toContain('aria-hidden="true" tabindex="-1"');
-    expect(html.startsWith('<div class="border border-[var(--color-border)]"><div class="overflow-x-auto"')).toBe(true);
+    expect(html).not.toContain('tabindex="-1"');
+    // Rahmen am äußeren Wrapper, damit obere Leiste und Tabelle in einem Kasten stehen.
+    expect(html).toMatch(/^<div class="[^"]*\bborder\b[^"]*"><div class="[^"]*\boverflow-x-auto\b/);
   });
 });

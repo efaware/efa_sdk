@@ -713,282 +713,282 @@ export function DataTable<T, K extends string | number>({
 
   return (
     <div className="border border-[var(--color-border)]">
-    {/* Obere Scrollleiste: Spiegel der unteren, nur wenn das Grid überbreit ist. */}
-    <TopScrollbar targetRef={containerRef} measureRef={headerRef} enabled={!isMobile} />
-    {/* overflow-x-auto: ein zu breites Grid scrollt IN SICH statt das ganze
-        Dokument seitwärts zu kippen (zusammen mit `min-w-min` an den Grid-Zeilen). */}
-    <div
-      ref={containerRef}
-      className="overflow-x-auto"
-      style={{ '--dt-cols': gridTemplate } as React.CSSProperties}
-    >
-      {/* Bulk-Bar */}
-      {selection && selection.selected.size > 0 && (
-        <div
-          className="flex items-center gap-2 px-3 py-2 text-sm border-b border-[var(--color-border)]"
-          style={{ background: 'var(--color-surface-raised)' }}
-        >
-          <span>{selection.selected.size} ausgewählt</span>
-          <button
-            type="button"
-            className="text-xs underline text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-            onClick={() => selection.onChange(new Set())}
+      {/* Obere Scrollleiste: Spiegel der unteren, nur wenn das Grid überbreit ist. */}
+      <TopScrollbar targetRef={containerRef} measureRef={headerRef} enabled={!isMobile} />
+      {/* overflow-x-auto: ein zu breites Grid scrollt IN SICH statt das ganze
+          Dokument seitwärts zu kippen (zusammen mit `min-w-min` an den Grid-Zeilen). */}
+      <div
+        ref={containerRef}
+        className="overflow-x-auto"
+        style={{ '--dt-cols': gridTemplate } as React.CSSProperties}
+      >
+        {/* Bulk-Bar */}
+        {selection && selection.selected.size > 0 && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 text-sm border-b border-[var(--color-border)]"
+            style={{ background: 'var(--color-surface-raised)' }}
           >
-            {/* „aufheben“, nicht „löschen“: der Knopf leert nur die Markierung.
-                Apps legen daneben oft eine echte Lösch-Aktion „Auswahl löschen“
-                in `bulkActions` — zwei gleich beschriftete Knöpfe mit
-                gegensätzlicher Wirkung (efa #348). */}
-            Auswahl aufheben
-          </button>
-          <div className="flex-1" />
-          {selection.bulkActions}
-        </div>
-      )}
+            <span>{selection.selected.size} ausgewählt</span>
+            <button
+              type="button"
+              className="text-xs underline text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+              onClick={() => selection.onChange(new Set())}
+            >
+              {/* „aufheben“, nicht „löschen“: der Knopf leert nur die Markierung.
+                  Apps legen daneben oft eine echte Lösch-Aktion „Auswahl löschen“
+                  in `bulkActions` — zwei gleich beschriftete Knöpfe mit
+                  gegensätzlicher Wirkung (efa #348). */}
+              Auswahl aufheben
+            </button>
+            <div className="flex-1" />
+            {selection.bulkActions}
+          </div>
+        )}
 
-      {/* Mobil-Toolbar: die breite Spalten-Kopfzeile passt nicht und wäre auf
-          40px-Zellen ohnehin nicht bedienbar — stattdessen „Alle auswählen"
-          (falls Selection) + Zahnrad (Spalten/Gruppieren/Sortieren/Reset). */}
-      {isMobile ? (
-        <div
-          className="flex items-center gap-3 px-3 py-2 text-xs font-medium border-b border-[var(--color-border)]"
-          style={{ background: 'var(--color-surface-raised)' }}
-        >
-          {selection && (
-            <label className="flex items-center gap-2 py-2 pr-2 cursor-pointer">
+        {/* Mobil-Toolbar: die breite Spalten-Kopfzeile passt nicht und wäre auf
+            40px-Zellen ohnehin nicht bedienbar — stattdessen „Alle auswählen"
+            (falls Selection) + Zahnrad (Spalten/Gruppieren/Sortieren/Reset). */}
+        {isMobile ? (
+          <div
+            className="flex items-center gap-3 px-3 py-2 text-xs font-medium border-b border-[var(--color-border)]"
+            style={{ background: 'var(--color-surface-raised)' }}
+          >
+            {selection && (
+              <label className="flex items-center gap-2 py-2 pr-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  aria-label="Alle auswählen"
+                />
+                <span className="text-[var(--color-text-muted)]">Alle</span>
+              </label>
+            )}
+            <div className="flex-1" />
+            {gearButton}
+          </div>
+        ) : (
+          /* Header (Desktop) */
+          <div
+            ref={headerRef}
+            className="grid items-center min-w-min px-3 py-2 text-xs font-medium border-b border-[var(--color-border)]"
+            style={{ gridTemplateColumns: 'var(--dt-cols)', background: 'var(--color-surface-raised)' }}
+          >
+            {selection && (
               <input
                 type="checkbox"
-                className="w-5 h-5"
                 checked={allSelected}
                 onChange={toggleAll}
                 aria-label="Alle auswählen"
               />
-              <span className="text-[var(--color-text-muted)]">Alle</span>
-            </label>
-          )}
-          <div className="flex-1" />
-          {gearButton}
-        </div>
-      ) : (
-        /* Header (Desktop) */
-        <div
-          ref={headerRef}
-          className="grid items-center min-w-min px-3 py-2 text-xs font-medium border-b border-[var(--color-border)]"
-          style={{ gridTemplateColumns: 'var(--dt-cols)', background: 'var(--color-surface-raised)' }}
-        >
-          {selection && (
-            <input
-              type="checkbox"
-              checked={allSelected}
-              onChange={toggleAll}
-              aria-label="Alle auswählen"
-            />
-          )}
-          {visibleColumns.map((col) => {
-            const activeSort = prefs.sort?.columnId === col.id ? prefs.sort.direction : null;
-            const filterValue = prefs.filters[col.id];
-            const isFiltered = filterValue != null;
-            return (
-              <HeaderCell
-                key={col.id}
-                columnId={col.id}
-                label={col.label}
-                dragColumnId={dragColumnId}
-                dropSide={dropTarget?.id === col.id ? dropTarget.side : null}
-                onDragStart={() => setDragColumnId(col.id)}
-                onDragEnd={() => { setDragColumnId(null); setDropTarget(null); }}
-                onDragOverSide={(side) => {
-                  if (dropTarget?.id !== col.id || dropTarget.side !== side) setDropTarget({ id: col.id, side });
-                }}
-                onDrop={(sourceId, side) => {
-                  dropColumn(sourceId, col.id, side);
-                  setDragColumnId(null);
-                  setDropTarget(null);
-                }}
-                onResizePreview={(px) => previewColumnWidth(col.id, px)}
-                onResizeCommit={(px) => setColumnWidth(col.id, px)}
-                onResizeCancel={() => containerRef.current?.style.setProperty('--dt-cols', gridTemplate)}
-                hasCustomWidth={columnWidths[col.id] != null}
-              >
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger asChild>
-                  <button
-                    type="button"
-                    className="flex items-center gap-1 min-w-0 px-1 py-0.5 hover:bg-[var(--color-surface)] text-left"
-                    style={{ borderRadius: 'var(--border-radius-md)' }}
-                  >
-                    <span className="min-w-0 truncate">{col.label}</span>
-                    {activeSort === 'asc' && <ChevronUp className="w-3 h-3" />}
-                    {activeSort === 'desc' && <ChevronDown className="w-3 h-3" />}
-                    {isFiltered && <Filter className="w-3 h-3 signal-text-primary" />}
-                  </button>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Content className="min-w-[220px] p-1">
-                  {col.sortable !== false && (
-                    <>
-                      <DropdownMenu.Item onSelect={() => setSort(col.id, 'asc')}>
-                        <ArrowUp className="w-4 h-4" />Sortieren A→Z
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => setSort(col.id, 'desc')}>
-                        <ArrowDown className="w-4 h-4" />Sortieren Z→A
-                      </DropdownMenu.Item>
-                      {activeSort && (
-                        <DropdownMenu.Item onSelect={clearSort}>
-                          Sortierung zurücksetzen
+            )}
+            {visibleColumns.map((col) => {
+              const activeSort = prefs.sort?.columnId === col.id ? prefs.sort.direction : null;
+              const filterValue = prefs.filters[col.id];
+              const isFiltered = filterValue != null;
+              return (
+                <HeaderCell
+                  key={col.id}
+                  columnId={col.id}
+                  label={col.label}
+                  dragColumnId={dragColumnId}
+                  dropSide={dropTarget?.id === col.id ? dropTarget.side : null}
+                  onDragStart={() => setDragColumnId(col.id)}
+                  onDragEnd={() => { setDragColumnId(null); setDropTarget(null); }}
+                  onDragOverSide={(side) => {
+                    if (dropTarget?.id !== col.id || dropTarget.side !== side) setDropTarget({ id: col.id, side });
+                  }}
+                  onDrop={(sourceId, side) => {
+                    dropColumn(sourceId, col.id, side);
+                    setDragColumnId(null);
+                    setDropTarget(null);
+                  }}
+                  onResizePreview={(px) => previewColumnWidth(col.id, px)}
+                  onResizeCommit={(px) => setColumnWidth(col.id, px)}
+                  onResizeCancel={() => containerRef.current?.style.setProperty('--dt-cols', gridTemplate)}
+                  hasCustomWidth={columnWidths[col.id] != null}
+                >
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 min-w-0 px-1 py-0.5 hover:bg-[var(--color-surface)] text-left"
+                      style={{ borderRadius: 'var(--border-radius-md)' }}
+                    >
+                      <span className="min-w-0 truncate">{col.label}</span>
+                      {activeSort === 'asc' && <ChevronUp className="w-3 h-3" />}
+                      {activeSort === 'desc' && <ChevronDown className="w-3 h-3" />}
+                      {isFiltered && <Filter className="w-3 h-3 signal-text-primary" />}
+                    </button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content className="min-w-[220px] p-1">
+                    {col.sortable !== false && (
+                      <>
+                        <DropdownMenu.Item onSelect={() => setSort(col.id, 'asc')}>
+                          <ArrowUp className="w-4 h-4" />Sortieren A→Z
                         </DropdownMenu.Item>
-                      )}
-                      <DropdownMenu.Separator />
-                    </>
-                  )}
-                  {groupBy.includes(col.id) ? (
-                    <DropdownMenu.Item onSelect={() => removeGroupBy(col.id)}>
-                      <Layers className="w-4 h-4" />Gruppierung aufheben
+                        <DropdownMenu.Item onSelect={() => setSort(col.id, 'desc')}>
+                          <ArrowDown className="w-4 h-4" />Sortieren Z→A
+                        </DropdownMenu.Item>
+                        {activeSort && (
+                          <DropdownMenu.Item onSelect={clearSort}>
+                            Sortierung zurücksetzen
+                          </DropdownMenu.Item>
+                        )}
+                        <DropdownMenu.Separator />
+                      </>
+                    )}
+                    {groupBy.includes(col.id) ? (
+                      <DropdownMenu.Item onSelect={() => removeGroupBy(col.id)}>
+                        <Layers className="w-4 h-4" />Gruppierung aufheben
+                      </DropdownMenu.Item>
+                    ) : (
+                      <DropdownMenu.Item onSelect={() => addGroupBy(col.id)}>
+                        <Layers className="w-4 h-4" />Nach dieser Spalte gruppieren
+                      </DropdownMenu.Item>
+                    )}
+                    <DropdownMenu.Separator />
+                    {col.filter && (
+                      <FilterEditor
+                        column={col}
+                        value={filterValue}
+                        onChange={(v) => setFilter(col.id, v)}
+                      />
+                    )}
+                    {columnWidths[col.id] != null && (
+                      <DropdownMenu.Item onSelect={() => setColumnWidth(col.id, null)}>
+                        <RotateCcw className="w-4 h-4" />Standardbreite
+                      </DropdownMenu.Item>
+                    )}
+                    <DropdownMenu.Item onSelect={() => setColumnVisible(col.id, false)} variant="danger">
+                      <EyeOff className="w-4 h-4" />Spalte ausblenden
                     </DropdownMenu.Item>
-                  ) : (
-                    <DropdownMenu.Item onSelect={() => addGroupBy(col.id)}>
-                      <Layers className="w-4 h-4" />Nach dieser Spalte gruppieren
-                    </DropdownMenu.Item>
-                  )}
-                  <DropdownMenu.Separator />
-                  {col.filter && (
-                    <FilterEditor
-                      column={col}
-                      value={filterValue}
-                      onChange={(v) => setFilter(col.id, v)}
-                    />
-                  )}
-                  {columnWidths[col.id] != null && (
-                    <DropdownMenu.Item onSelect={() => setColumnWidth(col.id, null)}>
-                      <RotateCcw className="w-4 h-4" />Standardbreite
-                    </DropdownMenu.Item>
-                  )}
-                  <DropdownMenu.Item onSelect={() => setColumnVisible(col.id, false)} variant="danger">
-                    <EyeOff className="w-4 h-4" />Spalte ausblenden
-                  </DropdownMenu.Item>
-                </DropdownMenu.Content>
-              </DropdownMenu.Root>
-              </HeaderCell>
-            );
-          })}
-          {/* Zahnrad-Spalte: Spalten-Inventar + Gruppieren-Sektion */}
-          {gearButton}
-        </div>
-      )}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
+                </HeaderCell>
+              );
+            })}
+            {/* Zahnrad-Spalte: Spalten-Inventar + Gruppieren-Sektion */}
+            {gearButton}
+          </div>
+        )}
 
-      {/* Rows (ggf. gruppiert) */}
-      {sortedFilteredRows.length === 0 ? (
-        <div className="px-3 py-8 text-center text-sm text-[var(--color-text-muted)]">
-          Keine Einträge
-        </div>
-      ) : (
-        buildRenderItems(sortedFilteredRows, groupBy, columnsById, expandedGroups).map((item, idx) => {
-          if (item.kind === 'group') {
-            const level = item.level ?? 0;
-            const groupColLabel = columnsById.get(groupBy[level])?.label ?? '';
-            return (
-              <div
-                key={`g:${item.key}`}
-                className="px-3 py-1.5 text-xs border-b border-[var(--color-border)] cursor-pointer select-none hover:bg-[var(--color-surface-raised)]"
-                style={{
-                  background: 'var(--color-surface-raised)',
-                  paddingLeft: 12 + level * 18,
-                }}
-                onClick={() => toggleGroup(item.key!)}
-                title={item.expanded ? 'Gruppe einklappen' : 'Gruppe ausklappen'}
-              >
-                <div className="flex items-center gap-2">
-                  {item.expanded
-                    ? <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
-                    : <ChevronRight className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />}
-                  <span className="text-[var(--color-text-muted)] uppercase text-[10px]">{groupColLabel}</span>
-                  <span className="font-medium text-[var(--color-text-primary)]">{item.label}</span>
-                  <span className="text-[var(--color-text-muted)]">({item.count})</span>
+        {/* Rows (ggf. gruppiert) */}
+        {sortedFilteredRows.length === 0 ? (
+          <div className="px-3 py-8 text-center text-sm text-[var(--color-text-muted)]">
+            Keine Einträge
+          </div>
+        ) : (
+          buildRenderItems(sortedFilteredRows, groupBy, columnsById, expandedGroups).map((item, idx) => {
+            if (item.kind === 'group') {
+              const level = item.level ?? 0;
+              const groupColLabel = columnsById.get(groupBy[level])?.label ?? '';
+              return (
+                <div
+                  key={`g:${item.key}`}
+                  className="px-3 py-1.5 text-xs border-b border-[var(--color-border)] cursor-pointer select-none hover:bg-[var(--color-surface-raised)]"
+                  style={{
+                    background: 'var(--color-surface-raised)',
+                    paddingLeft: 12 + level * 18,
+                  }}
+                  onClick={() => toggleGroup(item.key!)}
+                  title={item.expanded ? 'Gruppe einklappen' : 'Gruppe ausklappen'}
+                >
+                  <div className="flex items-center gap-2">
+                    {item.expanded
+                      ? <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
+                      : <ChevronRight className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />}
+                    <span className="text-[var(--color-text-muted)] uppercase text-[10px]">{groupColLabel}</span>
+                    <span className="font-medium text-[var(--color-text-primary)]">{item.label}</span>
+                    <span className="text-[var(--color-text-muted)]">({item.count})</span>
+                  </div>
                 </div>
-              </div>
-            );
-          }
-          const row = item.row!;
-          const key = rowKey(row);
-          const isChecked = selection?.selected.has(key) ?? false;
-          // Indentation der Daten-Rows passend zur letzten Gruppen-Ebene.
-          const rowIndent = groupBy.length > 0 ? 12 + groupBy.length * 18 : undefined;
+              );
+            }
+            const row = item.row!;
+            const key = rowKey(row);
+            const isChecked = selection?.selected.has(key) ?? false;
+            // Indentation der Daten-Rows passend zur letzten Gruppen-Ebene.
+            const rowIndent = groupBy.length > 0 ? 12 + groupBy.length * 18 : undefined;
 
-          // Mobil: Zeile als gestapelte Label/Wert-Karte statt Grid-Zeile. Die
-          // Spaltenauswahl (Zahnrad) wirkt weiter — ausgeblendete Spalten
-          // erscheinen auch in der Karte nicht.
-          if (isMobile) {
+            // Mobil: Zeile als gestapelte Label/Wert-Karte statt Grid-Zeile. Die
+            // Spaltenauswahl (Zahnrad) wirkt weiter — ausgeblendete Spalten
+            // erscheinen auch in der Karte nicht.
+            if (isMobile) {
+              return (
+                <div
+                  key={`r:${String(key)}:${idx}`}
+                  className={`flex flex-col gap-1.5 px-3 py-3 border-b border-[var(--color-border)] ${onRowClick ? 'cursor-pointer hover:bg-[var(--color-surface-raised)]' : ''}`}
+                  style={{ background: isChecked ? 'rgba(99,102,241,0.07)' : undefined, paddingLeft: rowIndent }}
+                  onClick={() => onRowClick?.(row)}
+                >
+                  {selection && (
+                    <label
+                      className="flex items-center gap-2 self-start py-1 pr-2 cursor-pointer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        className="w-5 h-5"
+                        checked={isChecked}
+                        onChange={() => toggleOne(key)}
+                        aria-label="Zeile auswählen"
+                      />
+                      <span className="text-xs text-[var(--color-text-muted)]">Auswählen</span>
+                    </label>
+                  )}
+                  {visibleColumns.map((col) => (
+                    <div key={col.id} className="flex flex-col gap-0.5">
+                      <span className="text-xs font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
+                        {col.label}
+                      </span>
+                      <div className="min-w-0 break-words text-sm">
+                        {col.cell ? col.cell(row) : formatCellValue(col, row)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+
             return (
               <div
                 key={`r:${String(key)}:${idx}`}
-                className={`flex flex-col gap-1.5 px-3 py-3 border-b border-[var(--color-border)] ${onRowClick ? 'cursor-pointer hover:bg-[var(--color-surface-raised)]' : ''}`}
-                style={{ background: isChecked ? 'rgba(99,102,241,0.07)' : undefined, paddingLeft: rowIndent }}
+                className={`grid items-center min-w-min px-3 py-2 text-sm border-b border-[var(--color-border)] ${onRowClick ? 'cursor-pointer hover:bg-[var(--color-surface-raised)]' : ''}`}
+                style={{
+                  gridTemplateColumns: 'var(--dt-cols)',
+                  background: isChecked ? 'rgba(99,102,241,0.07)' : undefined,
+                  paddingLeft: rowIndent,
+                }}
                 onClick={() => onRowClick?.(row)}
               >
                 {selection && (
-                  <label
-                    className="flex items-center gap-2 self-start py-1 pr-2 cursor-pointer"
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleOne(key)}
                     onClick={(e) => e.stopPropagation()}
-                  >
-                    <input
-                      type="checkbox"
-                      className="w-5 h-5"
-                      checked={isChecked}
-                      onChange={() => toggleOne(key)}
-                      aria-label="Zeile auswählen"
-                    />
-                    <span className="text-xs text-[var(--color-text-muted)]">Auswählen</span>
-                  </label>
+                    aria-label="Zeile auswählen"
+                  />
                 )}
                 {visibleColumns.map((col) => (
-                  <div key={col.id} className="flex flex-col gap-0.5">
-                    <span className="text-xs font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
-                      {col.label}
-                    </span>
-                    <div className="min-w-0 break-words text-sm">
-                      {col.cell ? col.cell(row) : formatCellValue(col, row)}
-                    </div>
+                  <div key={col.id} className="min-w-0 truncate">
+                    {col.cell ? col.cell(row) : formatCellValue(col, row)}
                   </div>
                 ))}
+                <div />
               </div>
             );
-          }
+          })
+        )}
 
-          return (
-            <div
-              key={`r:${String(key)}:${idx}`}
-              className={`grid items-center min-w-min px-3 py-2 text-sm border-b border-[var(--color-border)] ${onRowClick ? 'cursor-pointer hover:bg-[var(--color-surface-raised)]' : ''}`}
-              style={{
-                gridTemplateColumns: 'var(--dt-cols)',
-                background: isChecked ? 'rgba(99,102,241,0.07)' : undefined,
-                paddingLeft: rowIndent,
-              }}
-              onClick={() => onRowClick?.(row)}
-            >
-              {selection && (
-                <input
-                  type="checkbox"
-                  checked={isChecked}
-                  onChange={() => toggleOne(key)}
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label="Zeile auswählen"
-                />
-              )}
-              {visibleColumns.map((col) => (
-                <div key={col.id} className="min-w-0 truncate">
-                  {col.cell ? col.cell(row) : formatCellValue(col, row)}
-                </div>
-              ))}
-              <div />
-            </div>
-          );
-        })
-      )}
-
-      {footer && (
-        <div className="px-3 py-2 text-xs text-[var(--color-text-muted)] border-t border-[var(--color-border)]">
-          {footer}
-        </div>
-      )}
-    </div>
+        {footer && (
+          <div className="px-3 py-2 text-xs text-[var(--color-text-muted)] border-t border-[var(--color-border)]">
+            {footer}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -999,6 +999,15 @@ export function DataTable<T, K extends string | number>({
  */
 export function topScrollbarWidth(gridWidth: number, viewportWidth: number): number | null {
   return gridWidth > viewportWidth + 1 ? gridWidth : null;
+}
+
+/**
+ * Überträgt die Scrollposition. Abweichungen ≤ 1 px (Rundung bei Zoom/HiDPI) werden
+ * nicht zurückgeschrieben — sonst schreiben sich beide Leisten gegenseitig an und
+ * bremsen das Nachlaufen beim Trackpad-Wischen aus.
+ */
+function syncScroll(from: HTMLElement, to: HTMLElement): void {
+  if (Math.abs(to.scrollLeft - from.scrollLeft) > 1) to.scrollLeft = from.scrollLeft;
 }
 
 /**
@@ -1028,7 +1037,7 @@ function TopScrollbar({ targetRef, measureRef, enabled }: {
     observer.observe(measured);
     update();
     const follow = (): void => {
-      if (barRef.current) barRef.current.scrollLeft = target.scrollLeft;
+      if (barRef.current) syncScroll(target, barRef.current);
     };
     target.addEventListener('scroll', follow, { passive: true });
     return () => {
@@ -1048,9 +1057,12 @@ function TopScrollbar({ targetRef, measureRef, enabled }: {
       ref={barRef}
       aria-hidden="true"
       tabIndex={-1}
-      className="overflow-x-auto overflow-y-hidden"
+      // Inline statt Tailwind: funktioniert auch, wenn die App das SDK nicht scannt.
+      // minHeight: macOS-Overlay-Scrollleisten liegen ÜBER dem Inhalt — bei 1 px Höhe
+      // wäre der Daumen abgeschnitten. Klassische Leisten sind ohnehin höher.
+      style={{ overflowX: 'auto', overflowY: 'hidden', minHeight: 12 }}
       onScroll={() => {
-        if (targetRef.current && barRef.current) targetRef.current.scrollLeft = barRef.current.scrollLeft;
+        if (targetRef.current && barRef.current) syncScroll(barRef.current, targetRef.current);
       }}
     >
       <div style={{ width, height: 1 }} />
