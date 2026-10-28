@@ -13,6 +13,7 @@
  */
 export { Button } from './Button.js';
 export { Input } from './Input.js';
+export { Switch, SwitchControl, type SwitchProps, type SwitchControlProps, type SwitchTone } from './Switch.js';
 export { Badge } from './Badge.js';
 export { Alert, type AlertVariant } from './Alert.js';
 export { Dialog, DialogClose, DEFAULT_DIALOG_SIZE, type DialogSize } from './Dialog.js';
