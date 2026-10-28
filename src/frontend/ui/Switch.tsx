@@ -26,6 +26,12 @@ export interface SwitchControlProps {
   /** `danger` für Schalter, deren „an" eine Einschränkung ist (z. B. „Konto gesperrt"). */
   tone?: SwitchTone;
   className?: string;
+  /**
+   * Formularfeld-Name. Gesetzt rendert der Schalter zusätzlich ein verstecktes
+   * Feld mit `"true"`/`"false"`, damit nativer Submit und `FormData` den Wert
+   * sehen — auch `false`, anders als eine nicht angehakte Checkbox.
+   */
+  name?: string;
   'aria-label'?: string;
   'aria-labelledby'?: string;
   'aria-describedby'?: string;
@@ -39,9 +45,10 @@ export function SwitchControl({
   disabled = false,
   tone = 'primary',
   className = '',
+  name,
   ...aria
 }: SwitchControlProps) {
-  return (
+  const button = (
     <button
       type="button"
       role="switch"
@@ -55,6 +62,13 @@ export function SwitchControl({
     >
       <span className="switch-thumb" aria-hidden="true" />
     </button>
+  );
+  if (!name) return button;
+  return (
+    <>
+      {button}
+      <input type="hidden" name={name} value={checked ? 'true' : 'false'} disabled={disabled} />
+    </>
   );
 }
 

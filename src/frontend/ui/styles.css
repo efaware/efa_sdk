@@ -115,8 +115,11 @@
  * Spur 36 × 20 px, Knopf 16 px. Aus-Zustand bewusst dunkler als
  * `--color-border`: auf weißer Fläche wäre eine reine Rahmenfarbe kaum zu
  * erkennen (WCAG 1.4.11 verlangt 3 : 1 für Bedienelemente). Die Mischung
- * richtung `--color-text-primary` wird im dunklen Theme automatisch heller.
- * An-Zustand: Signalfarbe des Tons (`primary` bzw. `danger`). */
+ * Richtung `--color-text-primary` wird im dunklen Theme automatisch heller.
+ * Gegen alle Built-in-Themes nachgerechnet (Spur auf surface/surface-raised,
+ * Knopf auf Spur): test/switch.test.ts. An-Zustand: Signalfarbe des Tons
+ * (`primary` bzw. `danger`) mit weißem Knopf — dieselbe Paarung wie der
+ * Primär-Button; der Zustand ist zusätzlich an der Knopf-Position erkennbar. */
 .switch {
   position: relative;
   display: inline-flex;
@@ -155,4 +158,14 @@
 .switch[data-state='checked'] .switch-thumb { transform: translateX(16px); }
 @media (prefers-reduced-motion: reduce) {
   .switch, .switch-thumb { transition: none; }
+}
+/* Windows-Kontrastmodus ersetzt Hintergrundfarben durch Systemfarben — ohne
+ * diesen Block wären Spur und Knopf gleich und der Zustand unsichtbar. */
+@media (forced-colors: active) {
+  .switch { border-color: ButtonText; background: Canvas; }
+  .switch-thumb { background: ButtonText; box-shadow: none; }
+  .switch[data-state='checked'] { background: Highlight; }
+  .switch[data-state='checked'] .switch-thumb { background: HighlightText; }
+  .switch:disabled { border-color: GrayText; }
+  .switch:disabled .switch-thumb { background: GrayText; }
 }
