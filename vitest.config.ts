@@ -48,6 +48,8 @@ const perFileThresholds = {
   'src/frontend/ui/DataTable.tsx': { lines: 28, statements: 28, functions: 21, branches: 27 },
   // CSV-/XLSX-Writer; ungetestet ist nur der DOM-Download. Ist L 93.2 / S 93.6 / F 92.3 / B 94.3.
   'src/frontend/ui/tableExport.ts': { lines: 93, statements: 93, functions: 92, branches: 94 },
+  // Schalter (role="switch", Label/Erläuterung verknüpft): Ist L 100 / S 100 / F 100 / B 94.4.
+  'src/frontend/ui/Switch.tsx': { lines: 100, statements: 100, functions: 100, branches: 94 },
   'src/frontend/format.ts': { lines: 100, statements: 100, functions: 100, branches: 90 },
 };
 

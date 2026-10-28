@@ -1,7 +1,7 @@
 /**
  * @efa-one/sdk/frontend/ui/styles.css
  *
- * Globale Hilfsklassen, die `Badge` und `Skeleton` aus dem SDK-ui-Kit benötigen
+ * Globale Hilfsklassen, die `Badge`, `Skeleton`, `Alert` und `Switch` aus dem SDK-ui-Kit benötigen
  * (sie sind CSS-Klassen-basiert, nicht Tailwind-Arbitrary). Einmal pro App
  * importieren:  import '@efa-one/sdk/frontend/ui/styles.css';
  *
@@ -109,4 +109,63 @@
 @keyframes shimmer {
   from { background-position: 200% 0; }
   to   { background-position: -200% 0; }
+}
+
+/* ── Switch (Schalter für Ein/Aus-Werte) ─────────────────────────
+ * Spur 36 × 20 px, Knopf 16 px. Aus-Zustand bewusst dunkler als
+ * `--color-border`: auf weißer Fläche wäre eine reine Rahmenfarbe kaum zu
+ * erkennen (WCAG 1.4.11 verlangt 3 : 1 für Bedienelemente). Die Mischung
+ * Richtung `--color-text-primary` wird im dunklen Theme automatisch heller.
+ * Gegen alle Built-in-Themes nachgerechnet (Spur auf surface/surface-raised,
+ * Knopf auf Spur): test/switch.test.ts. An-Zustand: Signalfarbe des Tons
+ * (`primary` bzw. `danger`) mit weißem Knopf — dieselbe Paarung wie der
+ * Primär-Button; der Zustand ist zusätzlich an der Knopf-Position erkennbar. */
+.switch {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-text-primary) 45%, var(--color-border));
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.switch-primary[data-state='checked'] { background: var(--color-primary); }
+.switch-danger[data-state='checked']  { background: var(--color-danger); }
+.switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.switch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
+}
+.switch-thumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transform: translateX(0);
+  transition: transform 150ms ease;
+  pointer-events: none;
+}
+.switch[data-state='checked'] .switch-thumb { transform: translateX(16px); }
+@media (prefers-reduced-motion: reduce) {
+  .switch, .switch-thumb { transition: none; }
+}
+/* Windows-Kontrastmodus ersetzt Hintergrundfarben durch Systemfarben — ohne
+ * diesen Block wären Spur und Knopf gleich und der Zustand unsichtbar. */
+@media (forced-colors: active) {
+  .switch { border-color: ButtonText; background: Canvas; }
+  .switch-thumb { background: ButtonText; box-shadow: none; }
+  .switch[data-state='checked'] { background: Highlight; }
+  .switch[data-state='checked'] .switch-thumb { background: HighlightText; }
+  .switch:disabled { border-color: GrayText; }
+  .switch:disabled .switch-thumb { background: GrayText; }
 }

@@ -37,7 +37,7 @@ What the SDK provides:
   date is forbidden (renders `1.9.2026`, or the browser locale's `9/1/2026`) and is caught by
   the `no-restricted-syntax` ESLint gate. Spec: DESIGN_SYSTEM.md → „Datum & Uhrzeit“
 - `@efa-one/sdk/frontend/DevHeader.tsx` – dev-mode header
-- `@efa-one/sdk/frontend/ui` – das efa-one-Design-System-Kit (Button, Dialog, DropdownMenu, Tooltip, Badge, Input, Alert, EmptyState, Skeleton, RecordDialog, **DataTable**) + `@efa-one/sdk/frontend/ui/styles.css`
+- `@efa-one/sdk/frontend/ui` – das efa-one-Design-System-Kit (Button, Dialog, DropdownMenu, Tooltip, Badge, Input, Switch, Alert, EmptyState, Skeleton, RecordDialog, **DataTable**) + `@efa-one/sdk/frontend/ui/styles.css`
 - `@efa-one/sdk/frontend/viewPreferences` – Persistenz-Adapter der `DataTable` (`createViewPreferencesClient`, `useViewPreferences`)
 
 ### Externe Abhängigkeiten — erst prüfen, dann aufnehmen
@@ -557,7 +557,7 @@ Das efa-one-Design-System-Kit kommt aus dem SDK: **`@efa-one/sdk/frontend/ui`**
 per SDK-Version-Bump in alle Apps.
 
 ```tsx
-import { Button, Badge, Dialog, DropdownMenu, Tooltip, EmptyState, Skeleton, RecordDialog, Alert, DataTable } from '@efa-one/sdk/frontend/ui';
+import { Button, Switch, Badge, Dialog, DropdownMenu, Tooltip, EmptyState, Skeleton, RecordDialog, Alert, DataTable } from '@efa-one/sdk/frontend/ui';
 ```
 
 **Einmal pro App** die Begleit-Styles importieren (liefert die `.badge`/`.alert`/`.skeleton`-
@@ -583,6 +583,7 @@ Bestands-Apps auf Tailwind v3 tragen den Pfad stattdessen in `content` der
 | Component | When to use |
 |---|---|
 | `Button` | All buttons — variants: `primary`, `secondary`, `danger`, `ghost`. Pass `loading` for spinner. |
+| `Switch` | **Jeder boolesche Wert in der UI** (Einstellung an/aus: „Aktiv“, „Widget anzeigen“, „Benachrichtigungen“). `<Switch label="…" description="…" checked={v} onCheckedChange={setV} />`; nur der Schalter ohne Beschriftung: `SwitchControl` mit `aria-label`. Mit `name` liefert er im nativen Formular/`FormData` `"true"`/`"false"`. `tone="danger"`, wenn „an“ eine Einschränkung ist („Konto gesperrt“). **Checkbox nur** für (a) die Auswahl von Zeilen/Einträgen in Listen (macht die `DataTable`) und (b) aktive Bestätigungen („Ich habe gelesen …“, „Ich stimme zu“). |
 | `Badge` | Status labels — variants: `success`, `warning`, `danger`, `neutral`. |
 | `Alert` | Fehler-/Status-**Banner** in Formularen/Dialogen — variants: `error`, `success`, `warning`, `info`; ab SDK 1.25 immer mit „×" oben rechts (ohne `onDismiss` blendet es sich selbst aus — nur für feste Hinweise; Meldungen aus App-State immer mit `onDismiss`, sonst bleibt derselbe Fehler nach dem Schließen verborgen; `dismissible={false}` schaltet das „×" ab). Nie handgerollt (Kontrast-Falle, siehe Regel unten). |
 | `Dialog` | Confirmations, forms in modal. Always use for destructive actions. Breite über `size` (`sm`…`5xl`, Default `3xl` = 768 px, seit SDK 1.24) — nicht per `className` überschreiben. Kurze Bestätigungen („Wirklich löschen?“) mit `size="sm"`, sonst stehen zwei Zeilen Text in einem 768 px breiten Kasten. **Höhe** ist auf `90vh` gedeckelt: der Body scrollt, Header und Footer stehen fest — Formulare dürfen also beliebig lang werden, der Speichern-Button bleibt erreichbar. Ein Banner, das beim Scrollen sichtbar bleiben muss (Fehler/Validierung), gehört in den `banner`-Slot, **nicht** in `children`. |
@@ -811,7 +812,8 @@ const [saving, setSaving] = useState(false);
 
 **Boolean-Felder (z. B. `is_default`):**
 - Read: als „Ja"/„Nein" anzeigen
-- Edit: als **Checkbox** (`<input type="checkbox">`), niemals als Text-Input
+- Edit: als **Schalter** (`Switch` aus `@efa-one/sdk/frontend/ui`), niemals als Text-Input
+  und nicht als Checkbox (die bleibt der Zeilen-Auswahl und Bestätigungen vorbehalten)
 - Beim Submit: **immer** mitsenden (auch `false`), damit der User einen Default
   deaktivieren kann.
 
