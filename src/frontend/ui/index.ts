@@ -30,6 +30,7 @@ export {
   type RecordsOptions,
   type RecordsState,
   type RecordsSaveMode,
+  type RecordsDialogMode,
 } from './records.js';
 export { useIsMobile, MOBILE_QUERY } from '../useIsMobile.js';
 export {

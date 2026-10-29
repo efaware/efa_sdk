@@ -16,6 +16,7 @@
  */
 
 export type RecordsSaveMode = 'create' | 'edit';
+export type RecordsDialogMode = 'read' | 'edit' | 'create';
 
 export interface RecordsOptions<T, F> {
   /** Pfad der Liste, z. B. `/api/items`. Einzelne Einträge: `<endpoint>/<id>`. */
@@ -38,6 +39,17 @@ export interface RecordsOptions<T, F> {
   validate?: (form: F, mode: RecordsSaveMode) => string | null | undefined;
   /** ID eines Eintrags. Ohne Angabe `row.id`. */
   getId?: (row: T) => string;
+  /**
+   * Darf die Person Einträge ändern? Ohne Angabe `true`. `false` → Dialog nur lesend
+   * (kein Stift), z. B. `editable: can(user, 'write')`.
+   */
+  editable?: boolean;
+  /**
+   * In welchem Modus ein Klick auf einen Eintrag den Dialog öffnet. `'read'` (Vorgabe):
+   * erst lesen, Stift → bearbeiten. `'edit'`: direkt im Formular, sofern `editable`;
+   * ohne Schreibrecht immer lesend.
+   */
+  openIn?: 'read' | 'edit';
   /** Methode zum Ändern. Ohne Angabe `PUT`. */
   updateMethod?: 'PUT' | 'PATCH';
   /** Fetch-Implementierung (Tests). Ohne Angabe globales `fetch`. */
@@ -51,6 +63,8 @@ export interface RecordsState<T, F> {
   loadError: string;
   /** Steuerobjekt für `RecordDialog`: `null` zu, `{ id: 'new' }` anlegen, sonst Eintrag. */
   open: { id: string; item?: T } | null;
+  /** Modus des Dialogs (für `RecordDialog.mode`). */
+  mode: RecordsDialogMode;
   form: F;
   saving: boolean;
   saveError: string;
@@ -69,6 +83,12 @@ export interface RecordsController<T, F> {
   openCreate(): void;
   openRecord(row: T): void;
   close(): void;
+  /**
+   * Moduswechsel aus dem `RecordDialog` (`onModeChange`). Übernommen wird nur der
+   * Wechsel nach `'edit'` (Stift) und nur mit `editable`; das Zurücksetzen des Dialogs
+   * beim Öffnen ändert den hier gesetzten Modus nicht.
+   */
+  setMode(mode: RecordsDialogMode): void;
   setForm(next: F | ((prev: F) => F)): void;
   setField<K extends keyof F>(key: K, value: F[K]): void;
   /** Sind alle Pflichtfelder gefüllt? */
@@ -114,6 +134,7 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
     loading: true,
     loadError: '',
     open: null,
+    mode: 'read',
     form: initial.emptyForm(),
     saving: false,
     saveError: '',
@@ -194,6 +215,10 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
     if (state.saving) return;
     const open = state.open;
     if (!open) return;
+    if (mode === 'edit' && options.editable === false) {
+      set({ saveError: 'Keine Berechtigung zum Ändern.' });
+      return;
+    }
     if (!isComplete()) {
       set({ saveError: 'Bitte alle Pflichtfelder ausfüllen.' });
       return;
@@ -276,7 +301,7 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
       set({ loadError: '' });
     },
     openCreate() {
-      set({ open: { id: NEW_ID }, form: options.emptyForm(), saveError: '' });
+      set({ open: { id: NEW_ID }, mode: 'create', form: options.emptyForm(), saveError: '' });
     },
     openRecord(row) {
       const id = tryId(row);
@@ -286,10 +311,15 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
         set({ loadError: NO_ID });
         return;
       }
-      set({ open: { id, item: row }, form: options.toForm(row), saveError: '' });
+      const mode: RecordsDialogMode = options.openIn === 'edit' && options.editable !== false ? 'edit' : 'read';
+      set({ open: { id, item: row }, mode, form: options.toForm(row), saveError: '' });
     },
     close() {
       set({ open: null, saveError: '' });
+    },
+    setMode(mode) {
+      if (mode !== 'edit' || options.editable === false || !state.open?.item || state.mode === 'edit') return;
+      set({ mode: 'edit' });
     },
     setForm(next) {
       const form = typeof next === 'function' ? (next as (prev: F) => F)(state.form) : next;

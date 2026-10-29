@@ -765,6 +765,8 @@ const records = useRecords<Item, ItemForm>({
   toForm: (it) => ({ name: it.name, note: it.note ?? '' }),
   toPayload: (f) => ({ name: f.name.trim(), note: f.note.trim() || null }),
   required: ['name'],                 // sperrt „Erstellen"/„Speichern", solange leer
+  editable: canWrite,                 // ohne Schreibrecht nur lesen (kein Stift)
+  // openIn: 'edit',                  // Klick öffnet direkt im Formular statt erst lesend
   // validate: (f) => (… ? 'Meldung' : null),   // weitere Prüfung → Fehlerbanner
 });
 
@@ -779,8 +781,7 @@ const records = useRecords<Item, ItemForm>({
 />
 
 <RecordDialog
-  {...records.dialogProps}            // open, onSave (POST bzw. PUT), saving, error …
-  readOnly={!canWrite}                // ohne Schreibrecht kein Stift
+  {...records.dialogProps}            // open, mode, readOnly, onSave (POST bzw. PUT), saving, error …
   title={records.current?.name ?? 'Neuer Eintrag'}
   readContent={
     <dl className="space-y-3">
@@ -802,8 +803,8 @@ Liste, Ladefehler und Ladezustand kommen aus `records.rows`, `records.loadError`
 (Banner: `<Alert variant="error" onDismiss={records.dismissLoadError}>`), `records.loading` (nur beim ersten Laden; danach bleibt die Tabelle beim Neuladen stehen).
 Nach jedem Speichern und Löschen lädt die Liste selbst neu.
 Serverfehler (`{ "error": "…" }`) erscheinen als Banner im Dialog. Nicht zusätzlich
-`mode`/`onModeChange` an den `RecordDialog` geben: der Modus ergibt sich aus
-`openCreate` bzw. `openRecord` und dem Stift.
+`mode`/`onModeChange`/`readOnly` an den `RecordDialog` geben: der Modus ergibt sich aus
+`openCreate` bzw. `openRecord`, `openIn`, `editable` und dem Stift (ab SDK 1.27).
 
 `RecordDialog` allein (ohne `useRecords`) bleibt möglich, etwa für Einträge ohne
 eigenen REST-Endpunkt: `open={{ id: 'new' }}` öffnet zum Anlegen, `onSave(mode)`
