@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createElement } from 'react';
+import { Children, createElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 /**
@@ -67,5 +67,31 @@ describe('RecordDialog – Breite', () => {
 
   it('lässt ohne size die Dialog-Vorgabe greifen', () => {
     expect(renderRecordDialog().size).toBeUndefined();
+  });
+});
+
+describe('RecordDialog – readOnly', () => {
+  beforeEach(() => { dialogProps.length = 0; });
+  const html = (node: unknown) => renderToStaticMarkup(createElement('div', null, node as never));
+  // Footer enthält DialogClose (braucht den echten Dialog) → nur die Elemente zählen.
+  const footerParts = (p: Record<string, unknown>) =>
+    Children.toArray((p.footer as ReactElement<{ children: ReactNode }>).props.children).filter(isValidElement);
+
+  it('zeigt ohne readOnly Stift und „Bearbeiten“', () => {
+    const p = renderRecordDialog({ open: { id: 'a1' }, readContent: 'Inhalt' });
+    expect(footerParts(p)).toHaveLength(2);
+    expect(html(p.children)).toContain('aria-label="Bearbeiten"');
+  });
+
+  it('blendet mit readOnly Stift und „Bearbeiten“ aus, Inhalt bleibt', () => {
+    const p = renderRecordDialog({ open: { id: 'a1' }, readContent: 'Inhalt', readOnly: true });
+    expect(footerParts(p)).toHaveLength(1);
+    expect(html(p.children)).not.toContain('aria-label="Bearbeiten"');
+    expect(html(p.children)).toContain('Inhalt');
+  });
+
+  it('Anlegen bleibt mit readOnly möglich', () => {
+    const p = renderRecordDialog({ open: { id: 'new' }, readOnly: true });
+    expect(footerParts(p)).toHaveLength(2);
   });
 });

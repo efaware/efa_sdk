@@ -6,7 +6,7 @@ import { Alert } from './Alert.js';
 
 export type RecordDialogMode = 'read' | 'edit' | 'create';
 
-interface RecordDialogProps {
+export interface RecordDialogProps {
   /**
    * Steuerung von außen: `null` = Dialog zu, `{ id: 'new' }` = Create,
    * `{ id: <uuid>, item }` = Read/Edit für bestehenden Eintrag.
@@ -55,6 +55,12 @@ interface RecordDialogProps {
   /** Wenn gesetzt, bekommt das Fehler-Banner ein „×" zum manuellen Schließen. */
   onErrorDismiss?: () => void;
 
+  /**
+   * Nur lesen: kein Stift, kein „Bearbeiten“ (z. B. ohne Schreibrecht:
+   * `readOnly={!can(user, 'write')}`). Ein Dialog zum Anlegen bleibt davon unberührt.
+   */
+  readOnly?: boolean;
+
   /** Maximale Breite, wie beim `Dialog`. Ohne Angabe 768 px (`3xl`). */
   size?: DialogSize;
 
@@ -87,10 +93,12 @@ export function RecordDialog({
   title, readContent, editContent,
   onSave, saving, saveDisabled,
   error, onErrorDismiss,
+  readOnly,
   size,
   labels,
 }: RecordDialogProps) {
-  const [internalMode, setInternalMode] = useState<RecordDialogMode>('read');
+  // Gleich im passenden Modus starten (sonst zeigt das erste Rendern von `{ id: 'new' }` kurz den Lesemodus).
+  const [internalMode, setInternalMode] = useState<RecordDialogMode>(() => (open?.id === 'new' ? 'create' : 'read'));
   const mode = controlledMode ?? internalMode;
 
   // Modus zurücksetzen, wenn ein anderes Item geöffnet wird
@@ -112,7 +120,7 @@ export function RecordDialog({
   }
 
   async function handleSave() {
-    if (mode === 'read') return;
+    if (mode === 'read' || (readOnly && mode === 'edit')) return;
     await onSave(mode);
   }
 
@@ -138,9 +146,11 @@ export function RecordDialog({
         mode === 'read' ? (
           <>
             <DialogClose asChild><Button variant="secondary">{closeLabel}</Button></DialogClose>
-            <Button onClick={() => setMode('edit')}>
-              <Pencil className="w-4 h-4" />{editLabel}
-            </Button>
+            {!readOnly && (
+              <Button onClick={() => setMode('edit')}>
+                <Pencil className="w-4 h-4" />{editLabel}
+              </Button>
+            )}
           </>
         ) : (
           <>
@@ -154,16 +164,18 @@ export function RecordDialog({
     >
       {mode === 'read' ? (
         <div>
-          <div className="flex justify-end mb-2 -mt-1">
-            <button
-              onClick={() => setMode('edit')}
-              className="p-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-primary-text)] hover:bg-[var(--color-surface-raised)] transition-colors"
-              title={editLabel}
-              aria-label={editLabel}
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="flex justify-end mb-2 -mt-1">
+              <button
+                onClick={() => setMode('edit')}
+                className="p-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-primary-text)] hover:bg-[var(--color-surface-raised)] transition-colors"
+                title={editLabel}
+                aria-label={editLabel}
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           {readContent}
         </div>
       ) : (

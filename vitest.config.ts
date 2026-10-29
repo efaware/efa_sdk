@@ -50,6 +50,8 @@ const perFileThresholds = {
   'src/frontend/ui/tableExport.ts': { lines: 93, statements: 93, functions: 92, branches: 94 },
   // Schalter (role="switch", Label/Erläuterung verknüpft): Ist L 100 / S 100 / F 100 / B 94.4.
   'src/frontend/ui/Switch.tsx': { lines: 100, statements: 100, functions: 100, branches: 94 },
+  // Records-Ablauf (useRecords): jede Aktion löst genau ihre Anfrage aus. Ist L 95.2 / S 91.5 / F 100 / B 81.
+  'src/frontend/ui/records.ts': { lines: 95, statements: 91, functions: 100, branches: 80 },
   'src/frontend/format.ts': { lines: 100, statements: 100, functions: 100, branches: 90 },
 };
 

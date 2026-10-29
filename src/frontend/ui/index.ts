@@ -21,7 +21,16 @@ export * as DropdownMenu from './DropdownMenu.js';
 export { Tooltip, TooltipProvider } from './Tooltip.js';
 export { EmptyState } from './EmptyState.js';
 export { Skeleton, SkeletonRow } from './Skeleton.js';
-export { RecordDialog, type RecordDialogMode } from './RecordDialog.js';
+export { RecordDialog, type RecordDialogMode, type RecordDialogProps } from './RecordDialog.js';
+export { ConfirmDeleteDialog, type ConfirmDeleteDialogProps } from './ConfirmDeleteDialog.js';
+export { useRecords, type UseRecordsResult } from './useRecords.js';
+export {
+  createRecordsController,
+  type RecordsController,
+  type RecordsOptions,
+  type RecordsState,
+  type RecordsSaveMode,
+} from './records.js';
 export { useIsMobile, MOBILE_QUERY } from '../useIsMobile.js';
 export {
   DataTable,
