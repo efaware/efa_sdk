@@ -21,10 +21,11 @@ export interface RecordsOptions<T, F> {
   /** Pfad der Liste, z. B. `/api/items`. Einzelne Einträge: `<endpoint>/<id>`. */
   endpoint: string;
   /**
-   * Gateway-Basis der App (z. B. `getApiBase` aus `convergeApi.ts`). Als Funktion
-   * übergeben, weil die Basis erst nach dem Auth-Exchange feststeht.
+   * Gateway-Basis der App: `getApiBase` aus `convergeApi.ts`. Pflicht, weil ohne sie
+   * jede Anfrage an die Plattform statt an die App ginge. Als Funktion übergeben, die
+   * Basis steht erst nach dem Auth-Exchange fest. Lokal ohne Gateway: `''`.
    */
-  apiBase?: string | (() => string);
+  apiBase: string | (() => string);
   /** Leeres Formular für „Anlegen“. */
   emptyForm: () => F;
   /** Formular aus einem bestehenden Eintrag (Lesen/Bearbeiten). */
@@ -45,6 +46,7 @@ export interface RecordsOptions<T, F> {
 
 export interface RecordsState<T, F> {
   rows: T[];
+  /** Nur beim ersten Laden `true`; danach bleibt die Liste beim Neuladen stehen. */
   loading: boolean;
   loadError: string;
   /** Steuerobjekt für `RecordDialog`: `null` zu, `{ id: 'new' }` anlegen, sonst Eintrag. */
@@ -121,6 +123,7 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
   };
   const listeners = new Set<() => void>();
   let loadSeq = 0;
+  let loadedOnce = false;
 
   function set(patch: Partial<RecordsState<T, F>>): void {
     state = { ...state, ...patch };
@@ -132,13 +135,12 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
     return typeof b === 'function' ? b() : (b ?? '');
   }
 
-  function idOf(row: T): string {
+  function tryId(row: T): string | null {
     const id = options.getId ? options.getId(row) : (row as { id?: unknown }).id;
-    if (id === undefined || id === null || String(id) === '') {
-      throw new Error('useRecords: Eintrag ohne ID (getId angeben)');
-    }
-    return String(id);
+    return id === undefined || id === null || String(id) === '' ? null : String(id);
   }
+
+  const NO_ID = 'Eintrag ohne ID: Die Liste liefert kein Feld „id“ (in useRecords getId angeben).';
 
   function url(id?: string): string {
     const root = `${base()}${options.endpoint}`;
@@ -161,7 +163,7 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
 
   async function load(): Promise<void> {
     const seq = ++loadSeq;
-    set({ loading: true, loadError: '' });
+    set({ loading: !loadedOnce, loadError: '' });
     try {
       const res = await request(url(), 'GET');
       if (!res.ok) {
@@ -169,12 +171,19 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
         if (seq === loadSeq) set({ loading: false, loadError: msg });
         return;
       }
-      const data = (await res.json()) as unknown;
+      let data: unknown;
+      try {
+        data = await res.json();
+      } catch {
+        if (seq === loadSeq) set({ loading: false, loadError: 'Liste konnte nicht geladen werden (Antwort ist kein JSON, stimmen apiBase und endpoint?)' });
+        return;
+      }
       if (seq !== loadSeq) return;
       if (!Array.isArray(data)) {
         set({ loading: false, loadError: 'Liste konnte nicht geladen werden (Antwort ist keine Liste)' });
         return;
       }
+      loadedOnce = true;
       set({ rows: data as T[], loading: false });
     } catch {
       if (seq === loadSeq) set({ loading: false, loadError: 'Server nicht erreichbar' });
@@ -200,11 +209,12 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
       target = url();
       method = 'POST';
     } else {
-      if (!open.item) {
-        set({ saveError: 'Kein Eintrag zum Speichern geöffnet.' });
+      const id = open.item ? tryId(open.item) : null;
+      if (id === null) {
+        set({ saveError: open.item ? NO_ID : 'Kein Eintrag zum Speichern geöffnet.' });
         return;
       }
-      target = url(idOf(open.item));
+      target = url(id);
       method = options.updateMethod ?? 'PUT';
     }
     const payload = options.toPayload ? options.toPayload(state.form) : state.form;
@@ -219,14 +229,20 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
       set({ saving: false, saveError: 'Server nicht erreichbar' });
       return;
     }
-    set({ saving: false, open: null, form: options.emptyForm() });
+    // Nur den Dialog schließen, der gespeichert wurde (inzwischen kann ein anderer offen sein).
+    if (state.open === open) set({ saving: false, open: null, form: options.emptyForm() });
+    else set({ saving: false });
     await load();
   }
 
   async function confirmDelete(): Promise<void> {
     const row = state.deleteTarget;
     if (!row || state.deleting) return;
-    const id = idOf(row);
+    const id = tryId(row);
+    if (id === null) {
+      set({ deleteError: NO_ID });
+      return;
+    }
     set({ deleting: true, deleteError: '' });
     try {
       const res = await request(url(id), 'DELETE');
@@ -239,7 +255,7 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
       return;
     }
     const openItem = state.open?.item;
-    const closeDialog = openItem !== undefined && idOf(openItem) === id;
+    const closeDialog = openItem !== undefined && tryId(openItem) === id;
     set({ deleting: false, deleteTarget: null, ...(closeDialog ? { open: null } : {}) });
     await load();
   }
@@ -263,7 +279,14 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
       set({ open: { id: NEW_ID }, form: options.emptyForm(), saveError: '' });
     },
     openRecord(row) {
-      set({ open: { id: idOf(row), item: row }, form: options.toForm(row), saveError: '' });
+      const id = tryId(row);
+      if (id === null) {
+        // Kein Wurf aus dem Klick-Handler (wäre still): sichtbar als Ladefehler.
+        console.error('useRecords: Eintrag ohne ID (getId angeben)', row);
+        set({ loadError: NO_ID });
+        return;
+      }
+      set({ open: { id, item: row }, form: options.toForm(row), saveError: '' });
     },
     close() {
       set({ open: null, saveError: '' });

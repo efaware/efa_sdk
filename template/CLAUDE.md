@@ -748,15 +748,19 @@ Den Ablauf (Liste laden, Anlegen, Lesen, Bearbeiten, Löschen mit Bestätigung)
 merkt. Die App liefert nur Spalten, Formularfelder und die Abbildung Eintrag ↔ Formular.
 
 ```tsx
-import { Button, ConfirmDeleteDialog, DataTable, Input, RecordDialog, useRecords } from '@efa-one/sdk/frontend/ui';
+import { Plus } from 'lucide-react';
+import { Button, ConfirmDeleteDialog, DataTable, Input, RecordDialog, useRecords, type ColumnDef } from '@efa-one/sdk/frontend/ui';
 import { getApiBase } from '../convergeApi';
 
 interface Item { id: string; name: string; note: string | null }
 interface ItemForm { name: string; note: string }
 
+const canWrite = user.permissions?.includes('<sk>.write') ?? false;   // bzw. Helfer der App
+const columns: ColumnDef<Item>[] = [{ id: 'name', label: 'Name', accessor: (it) => it.name }];
+
 const records = useRecords<Item, ItemForm>({
   endpoint: '/api/items',             // GET Liste, POST anlegen, PUT /:id, DELETE /:id
-  apiBase: getApiBase,
+  apiBase: getApiBase,                // Pflicht: sonst gehen die Anfragen an die Plattform
   emptyForm: () => ({ name: '', note: '' }),
   toForm: (it) => ({ name: it.name, note: it.note ?? '' }),
   toPayload: (f) => ({ name: f.name.trim(), note: f.note.trim() || null }),
@@ -764,7 +768,7 @@ const records = useRecords<Item, ItemForm>({
   // validate: (f) => (… ? 'Meldung' : null),   // weitere Prüfung → Fehlerbanner
 });
 
-<Button onClick={records.openCreate}><Plus className="w-4 h-4" />Neu</Button>
+{canWrite && <Button onClick={records.openCreate}><Plus className="w-4 h-4" />Neu</Button>}
 
 <DataTable
   listId="items.list"
@@ -795,7 +799,8 @@ const records = useRecords<Item, ItemForm>({
 ```
 
 Liste, Ladefehler und Ladezustand kommen aus `records.rows`, `records.loadError`
-(Banner: `<Alert variant="error" onDismiss={records.dismissLoadError}>`), `records.loading`. Nach jedem Speichern und Löschen lädt die Liste selbst neu.
+(Banner: `<Alert variant="error" onDismiss={records.dismissLoadError}>`), `records.loading` (nur beim ersten Laden; danach bleibt die Tabelle beim Neuladen stehen).
+Nach jedem Speichern und Löschen lädt die Liste selbst neu.
 Serverfehler (`{ "error": "…" }`) erscheinen als Banner im Dialog. Nicht zusätzlich
 `mode`/`onModeChange` an den `RecordDialog` geben: der Modus ergibt sich aus
 `openCreate` bzw. `openRecord` und dem Stift.

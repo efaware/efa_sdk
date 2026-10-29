@@ -204,10 +204,79 @@ describe('createRecordsController', () => {
     expect(c.getState().deleteTarget).toBeNull();
   });
 
-  it('Eintrag ohne ID wird klar gemeldet', async () => {
-    const { c } = setup({}, () => json(200, [{ name: 'ohne', note: null }]));
+  it('Randfälle: message statt error, Bearbeiten ohne Eintrag, Löschen ohne Netz', async () => {
+    const m = setup({}, (x) => (x.method === 'GET' ? json(200, [{ id: 'a1', name: 'A', note: null }]) : json(422, { message: 'Ungültig' })));
+    await m.c.load();
+    m.c.openRecord(m.c.getState().rows[0]);
+    await m.c.save('edit');
+    expect(m.c.getState().saveError).toBe('Ungültig');
+
+    // Bearbeiten-Modus für den Anlegen-Dialog (kein Eintrag) sendet nichts.
+    m.c.openCreate();
+    m.c.setField('name', 'X');
+    await m.c.save('edit');
+    expect(m.c.getState().saveError).toBe('Kein Eintrag zum Speichern geöffnet.');
+
+    let n = 0;
+    const d = setup({}, () => {
+      n += 1;
+      if (n === 1) return json(200, [{ id: 'a1', name: 'A', note: null }]);
+      throw new TypeError('fetch failed');
+    });
+    await d.c.load();
+    d.c.requestDelete(d.c.getState().rows[0]);
+    await d.c.confirmDelete();
+    expect(d.c.getState()).toMatchObject({ deleting: false, deleteError: 'Server nicht erreichbar' });
+  });
+
+  it('Eintrag ohne ID wird sichtbar gemeldet statt still zu werfen', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { c, calls } = setup({}, () => json(200, [{ name: 'ohne', note: null }]));
     await c.load();
-    expect(() => c.openRecord(c.getState().rows[0])).toThrow(/getId/);
+    const row = c.getState().rows[0];
+    c.openRecord(row);
+    expect(c.getState()).toMatchObject({ open: null, loadError: expect.stringContaining('getId') });
+    c.requestDelete(row);
+    await c.confirmDelete();
+    expect(c.getState().deleteError).toContain('getId');
+    expect(calls.some((x) => x.method === 'DELETE')).toBe(false);
+    err.mockRestore();
+  });
+
+  it('Neuladen nach dem Speichern zeigt keinen Ladezustand (Tabelle bleibt stehen)', async () => {
+    const { c } = setup();
+    const seen: boolean[] = [];
+    c.subscribe(() => seen.push(c.getState().loading));
+    await c.load();
+    seen.length = 0;
+    c.openCreate();
+    c.setField('name', 'Beta');
+    await c.save('create');
+    expect(seen).not.toContain(true);
+    expect(c.getState().rows).toHaveLength(2);
+  });
+
+  it('ein inzwischen geöffneter anderer Dialog bleibt nach dem Speichern offen', async () => {
+    let release!: () => void;
+    const { c } = setup({}, (x) => {
+      if (x.method === 'GET') return json(200, [{ id: 'a1', name: 'A', note: null }, { id: 'b2', name: 'B', note: null }]);
+      return new Promise<Response>((r) => (release = () => r(json(201, {}))));
+    });
+    await c.load();
+    c.openCreate();
+    c.setField('name', 'Neu');
+    const saving = c.save('create');
+    c.openRecord(c.getState().rows[1]);
+    release();
+    await saving;
+    expect(c.getState().open).toMatchObject({ id: 'b2' });
+    expect(c.getState().form.name).toBe('B');
+  });
+
+  it('eine 200-Antwort ohne JSON wird nicht als „nicht erreichbar“ gemeldet', async () => {
+    const { c } = setup({}, () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('<html>'); } }) as unknown as Response);
+    await c.load();
+    expect(c.getState().loadError).toContain('kein JSON');
   });
 
   it('benachrichtigt Abonnenten und lässt sie wieder los', async () => {
@@ -226,6 +295,7 @@ describe('createRecordsController', () => {
     const { c, calls } = setup();
     c.setOptions({
       endpoint: '/api/other',
+      apiBase: '',
       emptyForm: () => ({ name: 'vorbelegt', note: '' }),
       toForm: (r) => ({ name: r.name, note: '' }),
       fetchImpl: (async (url: string) => {
@@ -258,6 +328,7 @@ describe('useRecords + RecordDialog (Server-Rendering)', () => {
     function Probe() {
       const r = useRecords<Item, ItemForm>({
         endpoint: '/api/items',
+        apiBase: '',
         emptyForm: () => ({ name: '', note: '' }),
         toForm: (x) => ({ name: x.name, note: '' }),
         required: ['name'],
