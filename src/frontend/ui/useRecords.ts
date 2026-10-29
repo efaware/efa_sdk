@@ -34,7 +34,7 @@ export interface UseRecordsResult<T, F> {
   /** In `RecordDialog` spreizen: `<RecordDialog {...records.dialogProps} title=… readContent=… editContent=… />`. */
   dialogProps: Pick<
     RecordDialogProps,
-    'open' | 'onOpenChange' | 'onSave' | 'saving' | 'saveDisabled' | 'error' | 'onErrorDismiss'
+    'open' | 'onOpenChange' | 'mode' | 'onModeChange' | 'readOnly' | 'onSave' | 'saving' | 'saveDisabled' | 'error' | 'onErrorDismiss'
   >;
 
   /** Löschen anfragen (öffnet die Bestätigung). */
@@ -60,6 +60,8 @@ export interface UseRecordsResult<T, F> {
  *   emptyForm: () => ({ name: '' }),
  *   toForm: (item) => ({ name: item.name }),
  *   required: ['name'],
+ *   editable: can(user, 'write'),   // ohne Schreibrecht nur lesen
+ *   // openIn: 'edit',               // Klick öffnet direkt im Formular
  * });
  *
  * <Button onClick={records.openCreate}>Neu</Button>
@@ -91,6 +93,7 @@ export function useRecords<T, F>(options: RecordsOptions<T, F>): UseRecordsResul
 
   const state: RecordsState<T, F> = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
   const complete = requiredFilled(state.form, options.required);
+  const readOnly = options.editable === false;
 
   return useMemo<UseRecordsResult<T, F>>(
     () => ({
@@ -111,6 +114,9 @@ export function useRecords<T, F>(options: RecordsOptions<T, F>): UseRecordsResul
         onOpenChange: (next) => {
           if (!next) controller.close();
         },
+        mode: state.mode,
+        onModeChange: controller.setMode,
+        readOnly,
         onSave: controller.save,
         saving: state.saving,
         saveDisabled: !complete,
@@ -128,6 +134,6 @@ export function useRecords<T, F>(options: RecordsOptions<T, F>): UseRecordsResul
         onErrorDismiss: controller.dismissDeleteError,
       },
     }),
-    [controller, state, complete],
+    [controller, state, complete, readOnly],
   );
 }

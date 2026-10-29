@@ -204,6 +204,43 @@ describe('createRecordsController', () => {
     expect(c.getState().deleteTarget).toBeNull();
   });
 
+  it('Modus: Vorgabe erst lesen, Stift → bearbeiten; Anlegen im Anlegen-Modus', async () => {
+    const { c } = setup();
+    await c.load();
+    c.openCreate();
+    expect(c.getState().mode).toBe('create');
+    c.openRecord(c.getState().rows[0]);
+    expect(c.getState().mode).toBe('read');
+    c.setMode('edit'); // Stift
+    expect(c.getState().mode).toBe('edit');
+  });
+
+  it("openIn: 'edit' öffnet direkt im Formular; das Zurücksetzen des Dialogs ändert das nicht", async () => {
+    const { c, calls } = setup({ openIn: 'edit', editable: true });
+    await c.load();
+    c.openRecord(c.getState().rows[0]);
+    expect(c.getState().mode).toBe('edit');
+    c.setMode('read'); // RecordDialog meldet beim Öffnen 'read'
+    expect(c.getState().mode).toBe('edit');
+    c.setField('name', 'Neu');
+    await c.save('edit');
+    expect(calls.find((x) => x.method === 'PUT')?.body).toMatchObject({ name: 'Neu' });
+  });
+
+  it('editable: false → nur lesen, kein Wechsel ins Formular, kein PUT', async () => {
+    const { c, calls } = setup({ openIn: 'edit', editable: false });
+    await c.load();
+    c.openRecord(c.getState().rows[0]);
+    expect(c.getState().mode).toBe('read');
+    c.setMode('edit');
+    expect(c.getState().mode).toBe('read');
+    await c.save('edit');
+    expect(calls.some((x) => x.method === 'PUT')).toBe(false);
+    c.close();
+    c.setMode('edit'); // ohne offenen Eintrag: nichts
+    expect(c.getState().mode).toBe('read');
+  });
+
   it('Randfälle: message statt error, Bearbeiten ohne Eintrag, Löschen ohne Netz', async () => {
     const m = setup({}, (x) => (x.method === 'GET' ? json(200, [{ id: 'a1', name: 'A', note: null }]) : json(422, { message: 'Ungültig' })));
     await m.c.load();
@@ -340,7 +377,7 @@ describe('useRecords + RecordDialog (Server-Rendering)', () => {
     renderToStaticMarkup(createElement(Probe));
     const r = seen[0];
     expect(r.loading).toBe(true);
-    expect(r.dialogProps).toMatchObject({ open: null, saving: false, saveDisabled: true, error: '' });
+    expect(r.dialogProps).toMatchObject({ open: null, mode: 'read', readOnly: false, saving: false, saveDisabled: true, error: '' });
     expect(r.deleteDialogProps).toMatchObject({ open: false, deleting: false, error: '' });
     expect(r.current).toBeNull();
   });

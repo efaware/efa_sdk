@@ -281,6 +281,13 @@ Excel export for such data. No backend or kernel change.
   scrollbar sits above the table and scrolls in sync with the bottom one. Not on
   mobile. The border moved to an outer wrapper.
 
+**1.27.0 — `useRecords`: edit first, read-only without permission.** No kernel or backend change.
+- `editable` (default `true`): `false` opens records read-only, no pencil, no PUT
+  (`editable: can(user, 'write')`).
+- `openIn: 'edit'`: a click on a record opens the form directly (with `editable`); default
+  `'read'` keeps read → pencil → edit.
+- `dialogProps` now carries `mode`, `onModeChange` and `readOnly`; do not pass them yourself.
+
 **1.26.0 — `useRecords`, `ConfirmDeleteDialog`, `Switch`.** No kernel or backend change.
 - `useRecords({ endpoint, apiBase, emptyForm, toForm, toPayload?, required?, validate? })`
   runs the whole records flow: load the list, open for create (`openCreate`) or read
