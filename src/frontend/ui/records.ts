@@ -215,7 +215,10 @@ export function createRecordsController<T, F>(initial: RecordsOptions<T, F>): Re
     if (state.saving) return;
     const open = state.open;
     if (!open) return;
-    if (mode === 'edit' && options.editable === false) return;
+    if (mode === 'edit' && options.editable === false) {
+      set({ saveError: 'Keine Berechtigung zum Ändern.' });
+      return;
+    }
     if (!isComplete()) {
       set({ saveError: 'Bitte alle Pflichtfelder ausfüllen.' });
       return;

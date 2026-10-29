@@ -236,6 +236,7 @@ describe('createRecordsController', () => {
     expect(c.getState().mode).toBe('read');
     await c.save('edit');
     expect(calls.some((x) => x.method === 'PUT')).toBe(false);
+    expect(c.getState().saveError).toBe('Keine Berechtigung zum Ändern.');
     c.close();
     c.setMode('edit'); // ohne offenen Eintrag: nichts
     expect(c.getState().mode).toBe('read');

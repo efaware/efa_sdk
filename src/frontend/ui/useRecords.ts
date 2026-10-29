@@ -114,7 +114,8 @@ export function useRecords<T, F>(options: RecordsOptions<T, F>): UseRecordsResul
         onOpenChange: (next) => {
           if (!next) controller.close();
         },
-        mode: state.mode,
+        // Ohne Schreibrecht nie das Formular zeigen (sonst Speichern ohne Wirkung).
+        mode: readOnly && state.mode === 'edit' ? 'read' : state.mode,
         onModeChange: controller.setMode,
         readOnly,
         onSave: controller.save,
