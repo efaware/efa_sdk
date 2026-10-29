@@ -281,6 +281,13 @@ Excel export for such data. No backend or kernel change.
   scrollbar sits above the table and scrolls in sync with the bottom one. Not on
   mobile. The border moved to an outer wrapper.
 
+**1.27.1 — `DataTable`: small radii for small controls.** No kernel or backend change.
+- Filter fields, icon buttons, the header button and the drag grip use `--border-radius-sm`
+  instead of `--border-radius-md`; the 16×16 box in the multi-select filter is capped at
+  4 px. Apps with soft corners (efa studio: 8/12/16 px) no longer get round boxes that look
+  like radio buttons or pill-shaped inputs. With all tokens at 3 px (kernel, older apps)
+  nothing changes.
+
 **1.27.0 — `useRecords`: edit first, read-only without permission.** No kernel or backend change.
 - `editable` (default `true`): `false` opens records read-only, no pencil, no PUT
   (`editable: can(user, 'write')`).
