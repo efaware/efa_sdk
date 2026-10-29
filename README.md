@@ -14,7 +14,7 @@ sub-paths — this keeps `express` out of the frontend and `react` out of the ba
 |---|---|---|
 | `@efa-one/sdk/backend` | Node/Express | Auth + token exchange (`requireAuth`, `createExchangeRouter`, `requireInternalOrAuth` …), health router, service discovery + gateway client (`serviceClient`, `resolveService`), clients for audit/reporting/mail/notifications, permission resolution/registration (`getUserPermissions`, `registerPermissions`, `checkPermission`), platform-admin check (`isPlatformAdmin` — top permission `efa-all`, legacy `converge-admin` accepted until Q1-2027; `requireAdmin`/`requireAdminOrPermission` use it), capability registry (`registerApiMetadata`), backend i18n |
 | `@efa-one/sdk/frontend` | Browser/React | postMessage IPC (`registerAppInfo`, `sendAtStart`, `navigateToApp`, `notifyRouteChange` …), react-i18next factory (`initI18n`), platform-admin check (`isPlatformAdmin`, `PLATFORM_ADMIN_PERMISSIONS`), `DevHeader` |
-| `@efa-one/sdk/frontend/ui` | Browser/React | The efa-one design-system kit: `Button`, `Input`, `Switch` (on/off settings — checkboxes only for row selection and confirmations), `Badge`, `Alert`, `Dialog`, `DropdownMenu`, `Tooltip`, `EmptyState`, `Skeleton`, `RecordDialog`, and the **`DataTable`** (sortable/filterable/groupable list with draggable, resizable columns, a per-user persisted view and CSV/Excel export of the current view; reflows to stacked cards below 640px). Also exports `useIsMobile` — the platform-wide 640px breakpoint hook. Ship its companion CSS once: `import '@efa-one/sdk/frontend/ui/styles.css'` |
+| `@efa-one/sdk/frontend/ui` | Browser/React | The efa-one design-system kit: `Button`, `Input`, `Switch` (on/off settings — checkboxes only for row selection and confirmations), `Badge`, `Alert`, `Dialog`, `DropdownMenu`, `Tooltip`, `EmptyState`, `Skeleton`, `RecordDialog` with `useRecords` (ready-made list/create/edit/delete flow) and `ConfirmDeleteDialog`, and the **`DataTable`** (sortable/filterable/groupable list with draggable, resizable columns, a per-user persisted view and CSV/Excel export of the current view; reflows to stacked cards below 640px). Also exports `useIsMobile` — the platform-wide 640px breakpoint hook. Ship its companion CSS once: `import '@efa-one/sdk/frontend/ui/styles.css'` |
 | `@efa-one/sdk/frontend/format` | Browser | Platform-wide date/time display — `formatDate` (`01.09.2026`), `formatDateTime` (`01.09.2026, 11:05`), `formatTime`, `formatFileStamp`, `localeForLanguage`. Always use these instead of `toLocaleDateString`/`toLocaleString`: without an options object those render `1.9.2026`, and without a locale argument they follow the browser language (`9/1/2026`) |
 | `@efa-one/sdk/frontend/viewPreferences` | Browser/React | Persistence seam for `DataTable` — `createViewPreferencesClient()` (standard `/api/view-preferences/:listId` adapter) + `useViewPreferences()` |
 
@@ -280,6 +280,22 @@ Excel export for such data. No backend or kernel change.
 - `DataTable`: when the grid is wider than its container, a second horizontal
   scrollbar sits above the table and scrolls in sync with the bottom one. Not on
   mobile. The border moved to an outer wrapper.
+
+**1.26.0 — `useRecords`, `ConfirmDeleteDialog`, `Switch`.** No kernel or backend change.
+- `useRecords({ endpoint, apiBase, emptyForm, toForm, toPayload?, required?, validate? })`
+  runs the whole records flow: load the list, open for create (`openCreate`) or read
+  (`openRecord`), save (`POST <endpoint>` or `PUT <endpoint>/:id`, `updateMethod: 'PATCH'`
+  optional), delete after confirmation (`DELETE <endpoint>/:id`), reload after each write,
+  server messages `{ "error" }` as banner. Spread `dialogProps` into `RecordDialog` and
+  `deleteDialogProps` into `ConfirmDeleteDialog`. The logic itself is
+  `createRecordsController` (no React, for tests or other frameworks).
+- Use it instead of hand-written `save()` functions: one found in a generated app returned
+  early for `{ id: 'new' }`, so „Erstellen" never sent anything and no type check noticed.
+- `ConfirmDeleteDialog`: delete confirmation, `size="sm"`, error banner.
+- `RecordDialog` takes `readOnly` (no pencil, no „Bearbeiten“, e.g. without write
+  permission); `RecordDialogProps` is exported.
+- `Switch`/`SwitchControl` for on/off values (checkboxes only for row selection and
+  confirmations).
 
 **Next minor (planned 1.23.0, not yet released) — exchange, cookie and S2S hardening.**
 Needs a kernel with efaware/efa_kernel#106 and #107 first (gateway exchange token

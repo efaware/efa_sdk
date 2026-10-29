@@ -588,6 +588,8 @@ Bestands-Apps auf Tailwind v3 tragen den Pfad stattdessen in `content` der
 | `Alert` | Fehler-/Status-**Banner** in Formularen/Dialogen — variants: `error`, `success`, `warning`, `info`; ab SDK 1.25 immer mit „×" oben rechts (ohne `onDismiss` blendet es sich selbst aus — nur für feste Hinweise; Meldungen aus App-State immer mit `onDismiss`, sonst bleibt derselbe Fehler nach dem Schließen verborgen; `dismissible={false}` schaltet das „×" ab). Nie handgerollt (Kontrast-Falle, siehe Regel unten). |
 | `Dialog` | Confirmations, forms in modal. Always use for destructive actions. Breite über `size` (`sm`…`5xl`, Default `3xl` = 768 px, seit SDK 1.24) — nicht per `className` überschreiben. Kurze Bestätigungen („Wirklich löschen?“) mit `size="sm"`, sonst stehen zwei Zeilen Text in einem 768 px breiten Kasten. **Höhe** ist auf `90vh` gedeckelt: der Body scrollt, Header und Footer stehen fest — Formulare dürfen also beliebig lang werden, der Speichern-Button bleibt erreichbar. Ein Banner, das beim Scrollen sichtbar bleiben muss (Fehler/Validierung), gehört in den `banner`-Slot, **nicht** in `children`. |
 | `RecordDialog` | **Pflicht** für Detail-Ansichten von Listen-Einträgen (siehe „Detail-Dialog-Pattern" weiter unten). Breite wie beim `Dialog` über `size` (Default 768 px). |
+| `useRecords` | Fertiger Ablauf für CRUD-Listen (laden, anlegen, bearbeiten, löschen) zu `RecordDialog` + `ConfirmDeleteDialog`. Statt eigener `save()`-Funktionen. |
+| `ConfirmDeleteDialog` | Bestätigung vor dem Löschen (`size="sm"`, Fehlerbanner). |
 | `DropdownMenu` | Context menus, "more" menus (MoreHorizontal icon). |
 | `Tooltip` | Hints on icon-only buttons. |
 | `EmptyState` | Every list/table that can have zero items. |
@@ -716,8 +718,8 @@ das ist **kein** seitenweiter Header und bleibt erlaubt. Nur ein expliziter User
 ## Detail-Dialog-Pattern (Pflicht für CRUD-Listen)
 
 Jede Liste, deren Einträge bearbeitet werden können, **muss** dieses einheitliche
-Read-/Edit-Verhalten implementieren. Die Komponente `RecordDialog` aus
-`components/ui/` kapselt es bereits.
+Read-/Edit-Verhalten implementieren. `RecordDialog` + `useRecords` aus
+`@efa-one/sdk/frontend/ui` kapseln es bereits.
 
 **UX-Vertrag:**
 
@@ -737,78 +739,75 @@ Read-/Edit-Verhalten implementieren. Die Komponente `RecordDialog` aus
 - Eine einzige Modal-Komponente pro Eintrag — kein Wechsel zwischen Detail-Page
   und Edit-Page, der den Listen-Scroll verliert.
 
-**Verwendung (`RecordDialog`):**
+**Verwendung (`useRecords` + `RecordDialog`, ab SDK 1.26):**
+
+Den Ablauf (Liste laden, Anlegen, Lesen, Bearbeiten, Löschen mit Bestätigung)
+**nicht selbst verdrahten**, sondern `useRecords` nehmen. Frei geschriebene
+`save()`-Funktionen sind die häufigste Fehlerquelle: z. B. bricht ein
+`if (open.id === 'new') return;` das Anlegen still ab, ohne dass TypeScript es
+merkt. Die App liefert nur Spalten, Formularfelder und die Abbildung Eintrag ↔ Formular.
 
 ```tsx
-import { RecordDialog } from '@efa-one/sdk/frontend/ui';
+import { Plus } from 'lucide-react';
+import { Button, ConfirmDeleteDialog, DataTable, Input, RecordDialog, useRecords, type ColumnDef } from '@efa-one/sdk/frontend/ui';
+import { getApiBase } from '../convergeApi';
 
-const [open, setOpen] = useState<{ id: string; item?: Item } | null>(null);
-const [form, setForm] = useState<Partial<Item>>({});
-const [saving, setSaving] = useState(false);
+interface Item { id: string; name: string; note: string | null }
+interface ItemForm { name: string; note: string }
 
-// Liste:
-{items.map((it) => (
-  <div
-    key={it.id}
-    onClick={() => { setForm(it); setOpen({ id: it.id, item: it }); }}
-    className="cursor-pointer hover:bg-[var(--color-surface-raised)] ..."
-  >
-    {/* Spalten */}
-    <button
-      onClick={(e) => { e.stopPropagation(); handleDelete(it.id); }}
-      title="Löschen"
-    >
-      <Trash2 className="w-4 h-4" />
-    </button>
-  </div>
-))}
+const canWrite = user.permissions?.includes('<sk>.write') ?? false;   // bzw. Helfer der App
+const columns: ColumnDef<Item>[] = [{ id: 'name', label: 'Name', accessor: (it) => it.name }];
 
-<button onClick={() => { setForm({}); setOpen({ id: 'new' }); }}>
-  <Plus className="w-4 h-4" />Neu
-</button>
+const records = useRecords<Item, ItemForm>({
+  endpoint: '/api/items',             // GET Liste, POST anlegen, PUT /:id, DELETE /:id
+  apiBase: getApiBase,                // Pflicht: sonst gehen die Anfragen an die Plattform
+  emptyForm: () => ({ name: '', note: '' }),
+  toForm: (it) => ({ name: it.name, note: it.note ?? '' }),
+  toPayload: (f) => ({ name: f.name.trim(), note: f.note.trim() || null }),
+  required: ['name'],                 // sperrt „Erstellen"/„Speichern", solange leer
+  // validate: (f) => (… ? 'Meldung' : null),   // weitere Prüfung → Fehlerbanner
+});
+
+{canWrite && <Button onClick={records.openCreate}><Plus className="w-4 h-4" />Neu</Button>}
+
+<DataTable
+  listId="items.list"
+  rows={records.rows}
+  columns={columns}                   // Aktions-Spalte: records.requestDelete(row)
+  rowKey={(it) => it.id}
+  onRowClick={records.openRecord}     // öffnet im Lesemodus, Stift → Bearbeiten
+/>
 
 <RecordDialog
-  open={open}
-  onOpenChange={setOpen}
-  title={open?.item?.name ?? 'Neuer Eintrag'}
-  saving={saving}
-  saveDisabled={!form.name}
-  onSave={async (mode) => {
-    setSaving(true);
-    try {
-      if (mode === 'create') {
-        await apiFetch('/api/items', { method: 'POST', body: JSON.stringify(form) });
-      } else {
-        await apiFetch(`/api/items/${open!.id}`, { method: 'PATCH', body: JSON.stringify(form) });
-      }
-      setOpen(null);
-      reload();
-    } finally { setSaving(false); }
-  }}
+  {...records.dialogProps}            // open, onSave (POST bzw. PUT), saving, error …
+  readOnly={!canWrite}                // ohne Schreibrecht kein Stift
+  title={records.current?.name ?? 'Neuer Eintrag'}
   readContent={
     <dl className="space-y-3">
       <div className="grid grid-cols-[140px_1fr] gap-3">
         <dt className="text-xs text-[var(--color-text-muted)]">Name</dt>
-        <dd className="text-sm">{open?.item?.name ?? '–'}</dd>
+        <dd className="text-sm">{records.current?.name ?? '–'}</dd>
       </div>
-      {/* … weitere Felder */}
     </dl>
   }
   editContent={
-    <div className="space-y-3">
-      <div>
-        <label className="block text-xs text-[var(--color-text-muted)] mb-1">Name</label>
-        <input
-          value={form.name ?? ''}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          className="w-full px-3 py-2 border border-[var(--color-border)] bg-[var(--color-surface)] text-sm"
-        />
-      </div>
-      {/* … weitere Inputs */}
-    </div>
+    <Input value={records.form.name} onChange={(e) => records.setField('name', e.target.value)} />
   }
 />
+
+<ConfirmDeleteDialog {...records.deleteDialogProps} itemName={records.deleteTarget?.name} />
 ```
+
+Liste, Ladefehler und Ladezustand kommen aus `records.rows`, `records.loadError`
+(Banner: `<Alert variant="error" onDismiss={records.dismissLoadError}>`), `records.loading` (nur beim ersten Laden; danach bleibt die Tabelle beim Neuladen stehen).
+Nach jedem Speichern und Löschen lädt die Liste selbst neu.
+Serverfehler (`{ "error": "…" }`) erscheinen als Banner im Dialog. Nicht zusätzlich
+`mode`/`onModeChange` an den `RecordDialog` geben: der Modus ergibt sich aus
+`openCreate` bzw. `openRecord` und dem Stift.
+
+`RecordDialog` allein (ohne `useRecords`) bleibt möglich, etwa für Einträge ohne
+eigenen REST-Endpunkt: `open={{ id: 'new' }}` öffnet zum Anlegen, `onSave(mode)`
+bekommt `'create'` oder `'edit'` und muss in **beiden** Fällen speichern.
 
 **Boolean-Felder (z. B. `is_default`):**
 - Read: als „Ja"/„Nein" anzeigen
