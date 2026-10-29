@@ -58,6 +58,15 @@ import { downloadFile, toCsv, toXlsx, trimChar, XLSX_MIME, type ExportCell, type
 const GROUP_KEY_SEP = '\x1f';
 const EMPTY_GROUP_LABEL = '– ohne –';
 
+// Radien der kleinen Bedienelemente (Kopf-Knöpfe, Filter-Felder, Icon-Knöpfe,
+// Zieh-Griff). Sie nehmen bewusst den kleinsten Token: Apps mit weichen Ecken
+// (efa studio: sm/md/lg = 8/12/16 px) machen sonst aus Feldern Pillen. Die
+// 16×16-Box im Mehrfach-Filter ist auf 4 px gedeckelt, sonst wird sie zum Kreis
+// und sieht aus wie ein Radio-Button. Kernel und ältere Apps (alle Token 3 px)
+// bleiben unverändert.
+const SMALL_CONTROL_RADIUS = 'var(--border-radius-sm)';
+const CHECKBOX_RADIUS = 'min(var(--border-radius-sm), 4px)';
+
 // ─── Typen ────────────────────────────────────────────────────────────────────
 
 export type FilterDef =
@@ -814,7 +823,7 @@ export function DataTable<T, K extends string | number>({
                     <button
                       type="button"
                       className="flex items-center gap-1 min-w-0 px-1 py-0.5 hover:bg-[var(--color-surface)] text-left"
-                      style={{ borderRadius: 'var(--border-radius-md)' }}
+                      style={{ borderRadius: SMALL_CONTROL_RADIUS }}
                     >
                       <span className="min-w-0 truncate">{col.label}</span>
                       {activeSort === 'asc' && <ChevronUp className="w-3 h-3" />}
@@ -1221,7 +1230,7 @@ function HeaderCell({
           padding: 2, cursor: 'grab', zIndex: 1,
           color: 'var(--color-text-muted)',
           background: 'var(--color-surface-raised)',
-          borderRadius: 'var(--border-radius-md)',
+          borderRadius: SMALL_CONTROL_RADIUS,
         }}
       >
         <GripVertical style={{ width: 12, height: 12 }} />
@@ -1278,7 +1287,7 @@ function FilterEditor<T>({
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           className="w-full px-2 py-1 text-xs border border-[var(--color-border)] bg-[var(--color-surface)]"
-          style={{ borderRadius: 'var(--border-radius-md)' }}
+          style={{ borderRadius: SMALL_CONTROL_RADIUS }}
         />
         {value?.text && (
           <button
@@ -1328,7 +1337,7 @@ function FilterEditor<T>({
                   borderColor: 'var(--color-border)',
                   background: checked ? 'var(--color-primary)' : 'var(--color-surface)',
                   color: 'white',
-                  borderRadius: 'var(--border-radius-md)',
+                  borderRadius: CHECKBOX_RADIUS,
                   fontSize: 10,
                 }}
               >
@@ -1354,7 +1363,7 @@ function FilterEditor<T>({
           }}
           onClick={(e) => e.stopPropagation()}
           className="w-full px-2 py-1 text-xs border border-[var(--color-border)] bg-[var(--color-surface)]"
-          style={{ borderRadius: 'var(--border-radius-md)' }}
+          style={{ borderRadius: SMALL_CONTROL_RADIUS }}
         >
           <option value="">– alle –</option>
           <option value="true">{f.labelTrue ?? 'Ja'}</option>
@@ -1400,7 +1409,7 @@ function ColumnInventoryButton<T>({
           type="button"
           className="p-2.5 sm:p-1 hover:bg-[var(--color-surface)] text-[var(--color-text-muted)] justify-self-end"
           title="Spalten konfigurieren"
-          style={{ borderRadius: 'var(--border-radius-md)' }}
+          style={{ borderRadius: SMALL_CONTROL_RADIUS }}
         >
           <Settings className="w-4 h-4" />
         </button>
@@ -1426,7 +1435,7 @@ function ColumnInventoryButton<T>({
                     onClick={() => moveGroupBy(id, -1)}
                     className="p-2 sm:p-0.5 disabled:opacity-30 hover:bg-[var(--color-surface-raised)]"
                     title="Ebene hoch"
-                    style={{ borderRadius: 'var(--border-radius-md)' }}
+                    style={{ borderRadius: SMALL_CONTROL_RADIUS }}
                   >
                     <ArrowUp className="w-3 h-3" />
                   </button>
@@ -1436,7 +1445,7 @@ function ColumnInventoryButton<T>({
                     onClick={() => moveGroupBy(id, 1)}
                     className="p-2 sm:p-0.5 disabled:opacity-30 hover:bg-[var(--color-surface-raised)]"
                     title="Ebene runter"
-                    style={{ borderRadius: 'var(--border-radius-md)' }}
+                    style={{ borderRadius: SMALL_CONTROL_RADIUS }}
                   >
                     <ArrowDown className="w-3 h-3" />
                   </button>
@@ -1445,7 +1454,7 @@ function ColumnInventoryButton<T>({
                     onClick={() => removeGroupBy(id)}
                     className="p-2 sm:p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
                     title="Diese Ebene entfernen"
-                    style={{ borderRadius: 'var(--border-radius-md)' }}
+                    style={{ borderRadius: SMALL_CONTROL_RADIUS }}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -1475,7 +1484,7 @@ function ColumnInventoryButton<T>({
                 e.target.value = '';
               }}
               className="flex-1 px-1 py-0.5 text-xs border border-[var(--color-border)] bg-[var(--color-surface)]"
-              style={{ borderRadius: 'var(--border-radius-md)' }}
+              style={{ borderRadius: SMALL_CONTROL_RADIUS }}
             >
               <option value="">– wählen –</option>
               {groupableCandidates.map((c) => (
@@ -1508,7 +1517,7 @@ function ColumnInventoryButton<T>({
                 onClick={() => moveColumn(col.id, -1)}
                 className="p-2 sm:p-0.5 disabled:opacity-30 hover:bg-[var(--color-surface-raised)]"
                 title="Nach oben"
-                style={{ borderRadius: 'var(--border-radius-md)' }}
+                style={{ borderRadius: SMALL_CONTROL_RADIUS }}
               >
                 <ArrowUp className="w-3 h-3" />
               </button>
@@ -1518,7 +1527,7 @@ function ColumnInventoryButton<T>({
                 onClick={() => moveColumn(col.id, 1)}
                 className="p-2 sm:p-0.5 disabled:opacity-30 hover:bg-[var(--color-surface-raised)]"
                 title="Nach unten"
-                style={{ borderRadius: 'var(--border-radius-md)' }}
+                style={{ borderRadius: SMALL_CONTROL_RADIUS }}
               >
                 <ArrowDown className="w-3 h-3" />
               </button>
