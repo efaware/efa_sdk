@@ -16,6 +16,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 const OUT_DIR = 'frontend';
 
@@ -26,8 +27,18 @@ fs.copyFileSync('src/frontend/ui/styles.css', path.join(OUT_DIR, 'ui/styles.css'
 // --- 3: Gate ------------------------------------------------------------------
 const ALLOWED_EXT = ['.js', '.mjs', '.cjs', '.json', '.css'];
 
-/** `from '…'`, `import('…')` und Side-Effect-`import '…'` — nur relative Specifier. */
-const SPECIFIER_RE = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s*)['"](\.{1,2}\/[^'"]*)['"]/g;
+/**
+ * Alle Import-Specifier einer Datei (`from '…'`, `import('…')`, Side-Effect-`import '…'`,
+ * `require`, `/// <reference path>`). Der TypeScript-Präprozessor überspringt Kommentare — seit die JSDoc im
+ * Output bleibt (`removeComments: false`), stehen dort Beispiel-Imports, die kein Gate
+ * auslösen dürfen.
+ */
+function relativeSpecifiers(source) {
+  const info = ts.preProcessFile(source, true, true);
+  return [...info.importedFiles, ...info.referencedFiles]
+    .map((f) => f.fileName)
+    .filter((name) => name.startsWith('./') || name.startsWith('../'));
+}
 
 function* walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -40,7 +51,7 @@ function* walk(dir) {
 const offenders = [];
 for (const file of walk(OUT_DIR)) {
   const source = fs.readFileSync(file, 'utf8');
-  for (const [, specifier] of source.matchAll(SPECIFIER_RE)) {
+  for (const specifier of relativeSpecifiers(source)) {
     if (!ALLOWED_EXT.some((ext) => specifier.endsWith(ext))) {
       offenders.push(`${file}: '${specifier}'`);
     }
