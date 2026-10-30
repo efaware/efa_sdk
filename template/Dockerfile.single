@@ -31,6 +31,9 @@ RUN cp backend/src/db/schema.sql        backend/dist/db/schema.sql \
 
 # ─── Runtime ──────────────────────────────────────────────────────────────────
 FROM node:24-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf
+# Kernel-Mindestversion dieser App: das efa Portal liest sie beim Freigeben einer Version, efa-agent prüft
+# sie vor dem Ausrollen (Updates aus dem Portal). Heben, sobald die App eine neuere Kernel-Schnittstelle nutzt.
+LABEL one.efa.min-kernel="v1.1.0"
 
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
