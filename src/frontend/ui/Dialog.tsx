@@ -19,6 +19,12 @@ interface DialogProps {
   footer?: React.ReactNode;
   /** Maximale Breite. Ohne Angabe 768 px (`3xl`); kurze Bestätigungen mit `sm`. */
   size?: DialogSize;
+  /**
+   * `data-*`-Attribute am Dialog-Inhalt. Die SDK-Dialoge setzen hier ihre
+   * Test-Markierungen (`data-efa-dialog`, `data-efa-mode`), an denen der Klicktest
+   * von efa studio sie erkennt.
+   */
+  dataAttributes?: Record<`data-${string}`, string | undefined>;
 }
 
 export type DialogSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
@@ -43,7 +49,7 @@ export function dialogWidthClass(size: DialogSize = DEFAULT_DIALOG_SIZE): string
   return `w-[calc(100%-2rem)] ${SIZE_CLASS[size]}`;
 }
 
-export function Dialog({ open, onOpenChange, trigger, title, description, children, banner, footer, size = DEFAULT_DIALOG_SIZE }: DialogProps) {
+export function Dialog({ open, onOpenChange, trigger, title, description, children, banner, footer, size = DEFAULT_DIALOG_SIZE, dataAttributes }: DialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       {trigger && <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger>}
@@ -69,6 +75,7 @@ export function Dialog({ open, onOpenChange, trigger, title, description, childr
           Inhaltshöhe überhaupt möglich).
         */}
         <RadixDialog.Content
+          {...dataAttributes}
           className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 ${dialogWidthClass(size)} flex flex-col max-h-[90vh] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95`}
         >
           {/* Header */}

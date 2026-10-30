@@ -136,6 +136,8 @@ export function RecordDialog({
       onOpenChange={(o) => { if (!o) handleClose(); }}
       title={title}
       size={size}
+      // Test-Markierungen für den Klicktest von efa studio (Modus, Aktionen).
+      dataAttributes={{ 'data-efa-dialog': 'record', 'data-efa-mode': mode }}
       // Banner-Slot statt Body: der Dialog-Body scrollt, ein Fehler dort würde
       // bei langen Formularen aus dem Blick rutschen — genau dann, wenn der
       // Nutzer unten auf „Speichern" drückt.
@@ -145,17 +147,17 @@ export function RecordDialog({
       footer={
         mode === 'read' ? (
           <>
-            <DialogClose asChild><Button variant="secondary">{closeLabel}</Button></DialogClose>
+            <DialogClose asChild><Button variant="secondary" data-efa-action="close">{closeLabel}</Button></DialogClose>
             {!readOnly && (
-              <Button onClick={() => setMode('edit')}>
+              <Button onClick={() => setMode('edit')} data-efa-action="edit">
                 <Pencil className="w-4 h-4" />{editLabel}
               </Button>
             )}
           </>
         ) : (
           <>
-            <DialogClose asChild><Button variant="secondary">{cancelLabel}</Button></DialogClose>
-            <Button onClick={handleSave} loading={!!saving} disabled={!!saveDisabled}>
+            <DialogClose asChild><Button variant="secondary" data-efa-action="cancel">{cancelLabel}</Button></DialogClose>
+            <Button onClick={handleSave} loading={!!saving} disabled={!!saveDisabled} data-efa-action="save">
               {mode === 'create' ? createLabel : saveLabel}
             </Button>
           </>

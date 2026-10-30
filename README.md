@@ -281,6 +281,15 @@ Excel export for such data. No backend or kernel change.
   scrollbar sits above the table and scrolls in sync with the bottom one. Not on
   mobile. The border moved to an outer wrapper.
 
+**1.28.0 — Test markers for the efa studio click test.** No kernel or backend change.
+- `RecordDialog`, `ConfirmDeleteDialog` and `DataTable` carry `data-efa-*` attributes:
+  `data-efa-dialog` (`record` | `confirm-delete`) and `data-efa-mode` on the dialog content,
+  `data-efa-action` (`save`, `edit`, `cancel`, `close`, `confirm-delete`) on the footer
+  buttons, `data-efa-list` (the `listId`) on the table and `data-efa-row` (the `rowKey`) on
+  each row. efa studio drives the create → save → edit → delete flow with them before it
+  reports an app as done. Nothing changes visually.
+- `Dialog` takes `dataAttributes` (`data-*` only) for its content element.
+
 **1.27.1 — `DataTable`: small radii for small controls.** No kernel or backend change.
 - Filter fields, icon buttons, the header button and the drag grip use `--border-radius-sm`
   instead of `--border-radius-md`; the 16×16 box in the multi-select filter is capped at
