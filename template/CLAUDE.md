@@ -1083,6 +1083,14 @@ gegen `/^[a-z][a-z0-9_]{1,63}$/` — Hyphens werden mit `HTTP 500` abgelehnt.
 
 ## Docker build notes
 
+- **Kernel-Mindestversion (`LABEL one.efa.min-kernel`, Pflicht):** Das Backend-Image (bzw. das eine Image der
+  Single-Container-Variante) trägt in der Runtime-Stage `LABEL one.efa.min-kernel="vX.Y.Z"`: die niedrigste
+  Kernel-Version, mit der die App läuft. Das efa Portal liest das Label beim Freigeben einer Version und startet
+  kein Update, dessen Ziel-Kernel älter ist; `efa-agent` prüft es auf der Instanz noch einmal. **Wer eine neue
+  Kernel-Schnittstelle nutzt (neuer Endpoint, neue Permission, SDK-Bump mit Kernel-Voraussetzung), hebt das Label
+  im selben PR.** Format genau `vX.Y.Z` (oder `vX.Y.Z-rc.N`); ein ungültiger Wert blockiert die Freigabe, ein
+  fehlendes Label heißt „keine Mindestversion bekannt“. Das Label muss schon beim Build auf `main` stimmen:
+  Release ist ein Retag (`crane tag`), danach lässt es sich nicht mehr ändern, ohne den Digest zu ändern.
 - **DB-Treiber:** `DB_DRIVER` (`postgres` Default | `sqlite`) schaltet `backend/src/db.ts`.
   `backend/src/dbSqlite.ts` ist ein `pg.Pool`-kompatibler SQLite-Adapter; `better-sqlite3`
   ist eine **optionalDependency** (lazy `require`, nur bei `sqlite` geladen) — der
