@@ -721,7 +721,8 @@ export function DataTable<T, K extends string | number>({
   );
 
   return (
-    <div className="border border-[var(--color-border)]">
+    // `data-efa-list`/`data-efa-row`: Test-Markierungen für den Klicktest von efa studio.
+    <div className="border border-[var(--color-border)]" data-efa-list={listId}>
       {/* Obere Scrollleiste: Spiegel der unteren, nur wenn das Grid überbreit ist. */}
       <TopScrollbar targetRef={containerRef} measureRef={headerRef} enabled={!isMobile} />
       {/* overflow-x-auto: ein zu breites Grid scrollt IN SICH statt das ganze
@@ -928,6 +929,7 @@ export function DataTable<T, K extends string | number>({
               return (
                 <div
                   key={`r:${String(key)}:${idx}`}
+                  data-efa-row={String(key)}
                   className={`flex flex-col gap-1.5 px-3 py-3 border-b border-[var(--color-border)] ${onRowClick ? 'cursor-pointer hover:bg-[var(--color-surface-raised)]' : ''}`}
                   style={{ background: isChecked ? 'rgba(99,102,241,0.07)' : undefined, paddingLeft: rowIndent }}
                   onClick={() => onRowClick?.(row)}
@@ -964,6 +966,7 @@ export function DataTable<T, K extends string | number>({
             return (
               <div
                 key={`r:${String(key)}:${idx}`}
+                data-efa-row={String(key)}
                 className={`grid items-center min-w-min px-3 py-2 text-sm border-b border-[var(--color-border)] ${onRowClick ? 'cursor-pointer hover:bg-[var(--color-surface-raised)]' : ''}`}
                 style={{
                   gridTemplateColumns: 'var(--dt-cols)',

@@ -45,13 +45,14 @@ export function ConfirmDeleteDialog({
       }}
       title={title ?? 'Eintrag löschen?'}
       size="sm"
+      dataAttributes={{ 'data-efa-dialog': 'confirm-delete' }}
       banner={error ? <Alert variant="error" onDismiss={onErrorDismiss}>{error}</Alert> : undefined}
       footer={
         <>
-          <Button variant="secondary" onClick={onCancel} disabled={!!deleting}>
+          <Button variant="secondary" onClick={onCancel} disabled={!!deleting} data-efa-action="cancel">
             {labels?.cancel ?? 'Abbrechen'}
           </Button>
-          <Button variant="danger" onClick={() => void onConfirm()} loading={!!deleting}>
+          <Button variant="danger" onClick={() => void onConfirm()} loading={!!deleting} data-efa-action="confirm-delete">
             {labels?.confirm ?? 'Löschen'}
           </Button>
         </>

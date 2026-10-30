@@ -34,6 +34,7 @@ describe('DataTable – obere Scrollleiste', () => {
     );
     expect(html).not.toContain('tabindex="-1"');
     // Rahmen am äußeren Wrapper, damit obere Leiste und Tabelle in einem Kasten stehen.
-    expect(html).toMatch(/^<div class="[^"]*\bborder\b[^"]*"><div class="[^"]*\boverflow-x-auto\b/);
+    // `data-efa-list` ist die Test-Markierung für den Klicktest von efa studio (1.28).
+    expect(html).toMatch(/^<div class="[^"]*\bborder\b[^"]*" data-efa-list="[^"]*"><div class="[^"]*\boverflow-x-auto\b/);
   });
 });
