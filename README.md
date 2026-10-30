@@ -281,6 +281,15 @@ Excel export for such data. No backend or kernel change.
   scrollbar sits above the table and scrolls in sync with the bottom one. Not on
   mobile. The border moved to an outer wrapper.
 
+**1.29.0 — UI reference for coding agents.** No kernel, backend or runtime change.
+- The package ships `frontend/ui/REFERENCE.md`: every export of `@efa-one/sdk/frontend/ui`
+  with its props and JSDoc, one section per module plus a contents list. It is generated
+  from the type declarations on every build (`scripts/ui-reference.mjs`) and capped at
+  6 KB per section, so an agent reads the one section it needs instead of the compiled
+  sources in `node_modules`. efa studio puts it into every workspace as `.efa/sdk-ui.md`.
+- The frontend `.d.ts` files keep their JSDoc (`removeComments: false`); editors now show
+  the prop documentation on hover.
+
 **1.28.0 — Test markers for the efa studio click test.** No kernel or backend change.
 - `RecordDialog`, `ConfirmDeleteDialog` and `DataTable` carry `data-efa-*` attributes:
   `data-efa-dialog` (`record` | `confirm-delete`) and `data-efa-mode` on the dialog content,

@@ -1,6 +1,6 @@
 {
   "name": "@efa-one/sdk",
-  "version": "1.28.0",
+  "version": "1.29.0",
   "description": "Offizielles SDK für efa-one-Apps: Auth/Session, Service-Discovery, Gateway-Client, Audit/Reporting/Mail/Notifications, Permission- und Capability-Registrierung sowie das Frontend-IPC-/i18n-Toolkit.",
   "license": "Apache-2.0",
   "type": "commonjs",
@@ -41,7 +41,7 @@
   "scripts": {
     "clean": "rm -rf backend frontend",
     "build:backend": "tsc -p tsconfig.backend.json",
-    "build:frontend": "tsc -p tsconfig.frontend.json && node scripts/postbuild-frontend.mjs",
+    "build:frontend": "tsc -p tsconfig.frontend.json && node scripts/postbuild-frontend.mjs && node scripts/ui-reference.mjs",
     "build": "npm run clean && npm run build:backend && npm run build:frontend",
     "typecheck": "tsc -p tsconfig.backend.json --noEmit && tsc -p tsconfig.frontend.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "lint": "eslint src test scripts",

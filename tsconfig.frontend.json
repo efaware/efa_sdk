@@ -6,7 +6,8 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "rootDir": "src/frontend",
-    "outDir": "frontend"
+    "outDir": "frontend",
+    "removeComments": false
   },
   "include": ["src/frontend/**/*"]
 }
