@@ -34,6 +34,9 @@ FROM node:24-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a
 # Kernel-Mindestversion dieser App: das efa Portal liest sie beim Freigeben einer Version, efa-agent prüft
 # sie vor dem Ausrollen (Updates aus dem Portal). Heben, sobald die App eine neuere Kernel-Schnittstelle nutzt.
 LABEL one.efa.min-kernel="v1.1.0"
+# Service-Key dieser App im Kernel (= SERVICE_KEY in .env). Das efa Portal legt die App damit als
+# Komponente an, efa-agent prüft Update-Aufträge dagegen. Beim Anlegen der App ersetzen (/new-app).
+LABEL one.efa.service-key="template_app"
 
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
