@@ -19,7 +19,7 @@ vi.mock('@radix-ui/react-dialog', () => {
     Close: (p: Record<string, unknown>) => createElement('button', { 'aria-label': p['aria-label'] as string }, p.children as never),
   };
 });
-const { SidePanel, sidePanelClass, keepOpenOnOutsideInteraction } = await import('../src/frontend/ui/SidePanel');
+const { SidePanel, sidePanelClass, keepOpenOnOutsideInteraction, focusPanelItself } = await import('../src/frontend/ui/SidePanel');
 
 describe('SidePanel', () => {
   it('nicht modal, Klick daneben verhindert, Marker gesetzt', () => {
@@ -27,6 +27,7 @@ describe('SidePanel', () => {
     expect(rootProps.at(-1)).toMatchObject({ open: true, modal: false });
     const c = contentProps.at(-1)!;
     expect(c.onInteractOutside).toBe(keepOpenOnOutsideInteraction);
+    expect(c.onOpenAutoFocus).toBe(focusPanelItself);
     expect(c['data-efa-sidepanel']).toBe('');
     expect(html).toContain('<h2>Dokument</h2>');
     expect(html).toContain('a.pdf');
@@ -47,6 +48,15 @@ describe('SidePanel', () => {
     const e = { preventDefault: vi.fn() };
     keepOpenOnOutsideInteraction(e);
     expect(e.preventDefault).toHaveBeenCalledOnce();
+  });
+
+  it('focusPanelItself: Fokus aufs Panel statt aufs X', () => {
+    const panel = { focus: vi.fn() };
+    const e = { preventDefault: vi.fn(), currentTarget: panel };
+    focusPanelItself(e);
+    expect(e.preventDefault).toHaveBeenCalledOnce();
+    expect(panel.focus).toHaveBeenCalledOnce();
+    expect(() => focusPanelItself({ preventDefault: () => {}, currentTarget: null })).not.toThrow();
   });
 
   it('Breiten: rechts, volle Höhe, mobil volle Breite', () => {

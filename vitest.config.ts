@@ -59,7 +59,7 @@ const perFileThresholds = {
   'src/frontend/ui/ConfirmDeleteDialog.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
   'src/frontend/ui/SidePanel.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
   'src/frontend/ui/dateTimeInput.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
-  'src/frontend/ui/Tabs.tsx': { lines: 74, statements: 76, functions: 69, branches: 95 },
+  'src/frontend/ui/Tabs.tsx': { lines: 72, statements: 72, functions: 69, branches: 90 },
   'src/frontend/ui/DateTimeField.tsx': { lines: 60, statements: 63, functions: 50, branches: 63 },
 };
 

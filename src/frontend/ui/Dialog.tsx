@@ -25,7 +25,7 @@ interface DialogProps {
    * von efa studio sie erkennt.
    */
   dataAttributes?: Record<`data-${string}`, string | undefined>;
-  /** Fokus beim Öffnen: erstes Feld (Vorgabe), `primary`/`cancel` (Fußzeile) oder `close` (X). */
+  /** Fokus beim Öffnen: erstes Feld sonst Dialog (Vorgabe), `primary`/`cancel` (Fußzeile), `close` (X). */
   initialFocus?: DialogInitialFocus;
 }
 
@@ -33,27 +33,40 @@ export type DialogInitialFocus = 'first-field' | 'primary' | 'cancel' | 'close';
 
 /** Minimal, damit die Auswahl ohne DOM testbar ist. */
 interface Queryable {
-  querySelector(selector: string): unknown;
   querySelectorAll(selector: string): ArrayLike<unknown>;
 }
 
 const FIELD_SELECTOR = 'input:not([type=hidden]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]):not([readonly])';
 const BUTTON_SELECTOR = 'button:not([disabled])';
 
+/** Sichtbar und damit fokussierbar (keine `display:none`-Dateifelder, keine zugeklappten Bereiche). */
+function isVisible(el: unknown): boolean {
+  const e = el as { getClientRects?: () => ArrayLike<unknown> };
+  return typeof e.getClientRects !== 'function' || e.getClientRects().length > 0;
+}
+
+/** Fokus auf den Dialog selbst (ohne Ring): weder Feld noch X, Enter löst nichts aus. */
+export const FOCUS_CONTENT = 'content' as const;
+
 /**
- * Element, das beim Öffnen den Fokus bekommt; `null` heißt: Radix entscheidet (X).
- * `body`/`footer` sind die beiden Bereiche des Dialogs. `primary` ist der letzte
- * Knopf der Fußzeile, `cancel` der erste — für Rückfragen vor destruktiven
- * Aktionen, damit Enter nichts löscht.
+ * Ziel des Fokus beim Öffnen: ein Element, `FOCUS_CONTENT` oder `null` (Radix: das X).
+ * `first-field` nimmt das erste sichtbare Feld, sonst den Dialog selbst — nie einen
+ * Knopf, denn der letzte ist oft „Löschen“. `primary`/`cancel`: letzter/erster
+ * Knopf der Fußzeile.
  */
-export function pickInitialFocus(mode: DialogInitialFocus, body: Queryable | null, footer: Queryable | null): unknown {
+export function pickInitialFocus(
+  mode: DialogInitialFocus,
+  body: Queryable | null,
+  footer: Queryable | null,
+  visible: (el: unknown) => boolean = isVisible,
+): unknown {
   if (mode === 'close') return null;
   if (mode === 'first-field') {
-    const field = body?.querySelector(FIELD_SELECTOR);
-    if (field) return field;
+    const fields = Array.from(body?.querySelectorAll(FIELD_SELECTOR) ?? []);
+    return fields.find(visible) ?? FOCUS_CONTENT;
   }
-  const buttons = footer?.querySelectorAll(BUTTON_SELECTOR);
-  if (!buttons || buttons.length === 0) return null;
+  const buttons = Array.from(footer?.querySelectorAll(BUTTON_SELECTOR) ?? []).filter(visible);
+  if (buttons.length === 0) return FOCUS_CONTENT;
   return mode === 'cancel' ? buttons[0] : buttons[buttons.length - 1];
 }
 
@@ -82,11 +95,12 @@ export function dialogWidthClass(size: DialogSize = DEFAULT_DIALOG_SIZE): string
 export function Dialog({ open, onOpenChange, trigger, title, description, children, banner, footer, size = DEFAULT_DIALOG_SIZE, dataAttributes, initialFocus = 'first-field' }: DialogProps) {
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const footerRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
   const onOpenAutoFocus = (e: Event) => {
-    const target = pickInitialFocus(initialFocus, bodyRef.current, footerRef.current) as HTMLElement | null;
-    if (!target) return;
+    const target = pickInitialFocus(initialFocus, bodyRef.current, footerRef.current);
+    if (target === null) return;
     e.preventDefault();
-    target.focus();
+    (target === FOCUS_CONTENT ? contentRef.current : (target as HTMLElement))?.focus();
   };
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -114,6 +128,7 @@ export function Dialog({ open, onOpenChange, trigger, title, description, childr
         */}
         <RadixDialog.Content
           {...dataAttributes}
+          ref={contentRef}
           onOpenAutoFocus={onOpenAutoFocus}
           className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 ${dialogWidthClass(size)} flex flex-col max-h-[90vh] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95`}
         >

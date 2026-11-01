@@ -667,8 +667,8 @@ Das gilt für:
    `SidePanel`. Ausnahme: die kurze Rückfrage (`ConfirmDialog`).
 5. **Breiten:** Formulare `2xl`, Lese-Ansichten `3xl`, Rückfragen `sm`. Listen und
    Volltexte gehören nie in einen Dialog.
-6. **Fokus beim Öffnen** auf das erste Feld (Vorgabe von `Dialog`), bei Rückfragen
-   auf „Abbrechen“; nie auf das X.
+6. **Fokus beim Öffnen** auf das erste Feld, ohne Feld auf den Dialog selbst (Vorgabe
+   von `Dialog`), bei Rückfragen auf „Abbrechen“; nie auf das X, nie auf „Löschen“.
 
 ## Page-Layout — zentrierte Container (Pflicht)
 

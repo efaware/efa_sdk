@@ -1,30 +1,41 @@
 import { describe, it, expect } from 'vitest';
-import { pickInitialFocus } from '../src/frontend/ui/Dialog';
+import { pickInitialFocus, FOCUS_CONTENT } from '../src/frontend/ui/Dialog';
 
-/** Fokus beim Öffnen: erstes Feld, sonst Primärknopf; Rückfragen auf Abbrechen; nie das X. */
-function area(field: unknown, buttons: unknown[]) {
-  return { querySelector: () => field, querySelectorAll: () => buttons };
+/**
+ * Fokus beim Öffnen: erstes sichtbares Feld, sonst der Dialog selbst (nie ein Knopf,
+ * der letzte ist oft „Löschen“); Rückfragen auf Abbrechen; nie das X.
+ */
+function area(items: unknown[]) {
+  return { querySelectorAll: () => items };
 }
+const shown = (el: unknown) => !(el as { hidden?: boolean }).hidden;
 
 describe('pickInitialFocus', () => {
   const cancel = { name: 'cancel' };
-  const save = { name: 'save' };
+  const del = { name: 'löschen' };
   const field = { name: 'field' };
+  const hiddenFile = { name: 'file', hidden: true };
 
-  it('first-field: erstes Feld im Body', () => {
-    expect(pickInitialFocus('first-field', area(field, []), area(null, [cancel, save]))).toBe(field);
+  it('first-field: erstes sichtbare Feld, versteckte übersprungen', () => {
+    expect(pickInitialFocus('first-field', area([hiddenFile, field]), area([cancel, del]), shown)).toBe(field);
   });
-  it('first-field ohne Feld: Primärknopf (letzter)', () => {
-    expect(pickInitialFocus('first-field', area(null, []), area(null, [cancel, save]))).toBe(save);
-    expect(pickInitialFocus('first-field', null, area(null, [cancel, save]))).toBe(save);
+  it('first-field ohne Feld: der Dialog selbst, nicht „Löschen“', () => {
+    expect(pickInitialFocus('first-field', area([hiddenFile]), area([cancel, del]), shown)).toBe(FOCUS_CONTENT);
+    expect(pickInitialFocus('first-field', null, area([cancel, del]), shown)).toBe(FOCUS_CONTENT);
   });
-  it('primary und cancel', () => {
-    expect(pickInitialFocus('primary', area(field, []), area(null, [cancel, save]))).toBe(save);
-    expect(pickInitialFocus('cancel', area(field, []), area(null, [cancel, save]))).toBe(cancel);
+  it('primary und cancel, nur sichtbare Knöpfe', () => {
+    expect(pickInitialFocus('primary', null, area([cancel, del]), shown)).toBe(del);
+    expect(pickInitialFocus('cancel', null, area([{ hidden: true }, cancel, del]), shown)).toBe(cancel);
   });
-  it('close oder keine Knöpfe: Radix entscheidet', () => {
-    expect(pickInitialFocus('close', area(field, []), area(null, [cancel]))).toBeNull();
-    expect(pickInitialFocus('primary', null, area(null, []))).toBeNull();
-    expect(pickInitialFocus('primary', null, null)).toBeNull();
+  it('ohne Knöpfe der Dialog selbst; close: Radix (das X)', () => {
+    expect(pickInitialFocus('primary', null, area([]), shown)).toBe(FOCUS_CONTENT);
+    expect(pickInitialFocus('cancel', null, null, shown)).toBe(FOCUS_CONTENT);
+    expect(pickInitialFocus('close', area([field]), area([cancel]), shown)).toBeNull();
+  });
+  it('Standard-Sichtbarkeit: getClientRects leer = unsichtbar, ohne Funktion = sichtbar', () => {
+    const invisible = { getClientRects: () => [] };
+    const visible = { getClientRects: () => [{}] };
+    expect(pickInitialFocus('first-field', area([invisible, visible]), null)).toBe(visible);
+    expect(pickInitialFocus('first-field', area([{ plain: true }]), null)).toEqual({ plain: true });
   });
 });

@@ -289,9 +289,10 @@ Excel export for such data. No backend or kernel change.
   instead of `datetime-local`, with `parseDateTimeDe`/`maskDateTimeInput`).
 - `ConfirmDeleteDialog` is now a thin wrapper around `ConfirmDialog`; its markers stay
   `confirm-delete`. Its initial focus is on „Abbrechen“, so Enter no longer deletes.
-- `Dialog` focuses the first input on open (`initialFocus`: `first-field` default,
-  `primary`, `cancel`, `close`); before, the focus ring sat on the X. The X has
-  `aria-label="Schließen"`.
+- `Dialog` focuses the first visible input on open, otherwise the dialog itself, never
+  a footer button (the last one is often „Löschen“). `initialFocus`: `first-field`
+  (default), `primary`, `cancel`, `close` (the X, as before 1.30). The X has
+  `aria-label="Schließen"`. `SidePanel` focuses the panel itself.
 - Template rules „Dialoge“: one way to close, at most three footer buttons, no
   dialog on top of a dialog.
 

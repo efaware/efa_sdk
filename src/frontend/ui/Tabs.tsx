@@ -52,7 +52,10 @@ export function Tabs<K extends string>({ items, value, onChange, ariaLabel, idPr
   const prefix = idPrefix ?? tabIdPrefix(ariaLabel);
   const refs = useRef<Partial<Record<string, HTMLButtonElement | null>>>({});
 
+  // Nur beim Wechsel, nicht beim ersten Rendern: sonst scrollt die Seite zur Leiste.
+  const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return; }
     refs.current[value]?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [value]);
 
@@ -114,7 +117,8 @@ export function Tabs<K extends string>({ items, value, onChange, ariaLabel, idPr
       {/* Fade-Kante: zeigt mobil, dass rechts noch Reiter liegen. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 sm:hidden bg-gradient-to-r from-transparent to-[var(--color-background)]"
+        className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 sm:hidden"
+        style={{ background: 'linear-gradient(to right, transparent, var(--color-background))' }}
       />
     </div>
   );

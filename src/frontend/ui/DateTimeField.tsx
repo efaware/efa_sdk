@@ -49,11 +49,13 @@ export function DateTimeField({ value, onChange, label, hint, min, id, disabled,
   const error = touched ? dateTimeFieldError(text, { min, required }) : null;
 
   function handleChange(raw: string) {
-    const masked = /[.:\s]/.test(raw) && raw.length < text.length ? raw : maskDateTimeInput(raw);
+    // Beim Löschen den Text lassen, wie er ist; sonst Maske (auch für eingefügte ISO-Daten).
+    const masked = raw.length < text.length ? raw : maskDateTimeInput(raw);
     setText(masked);
     const parsed = parseDateTimeDe(masked);
     const err = dateTimeFieldError(masked, { min, required });
-    onChange(parsed.ok ? parsed.iso : null, err === null);
+    // Vertrag: valid=false ⇒ iso=null, auch wenn nur `min` verletzt ist.
+    onChange(err === null && parsed.ok ? parsed.iso : null, err === null);
   }
 
   return (

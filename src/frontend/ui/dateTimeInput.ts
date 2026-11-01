@@ -38,6 +38,9 @@ export function parseDateTimeDe(text: string): DateTimeParseResult {
  * abgeschnitten. Eingaben, die schon Trenner enthalten, bleiben lesbar.
  */
 export function maskDateTimeInput(text: string): string {
+  // Eingefügtes ISO-Datum (2026-11-02 06:00, 2026-11-02T06:00) umstellen statt zu zerhacken.
+  const iso = /^\s*(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?/.exec(text);
+  if (iso) return `${iso[3]}.${iso[2]}.${iso[1]}${iso[4] !== undefined ? ` ${iso[4]}:${iso[5]}` : ''}`;
   const d = text.replace(/\D/g, '').slice(0, 12);
   const parts = [d.slice(0, 2), d.slice(2, 4), d.slice(4, 8), d.slice(8, 10), d.slice(10, 12)];
   let out = parts[0];

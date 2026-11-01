@@ -46,6 +46,11 @@ describe('maskDateTimeInput', () => {
     expect(maskDateTimeInput('01.11.2026 06:00')).toBe('01.11.2026 06:00');
     expect(maskDateTimeInput('')).toBe('');
   });
+  it('eingefügtes ISO-Datum wird umgestellt', () => {
+    expect(maskDateTimeInput('2026-11-02 06:00')).toBe('02.11.2026 06:00');
+    expect(maskDateTimeInput('2026-11-02T06:00:00Z')).toBe('02.11.2026 06:00');
+    expect(maskDateTimeInput(' 2026-11-02')).toBe('02.11.2026');
+  });
 });
 
 describe('DateTimeField', () => {

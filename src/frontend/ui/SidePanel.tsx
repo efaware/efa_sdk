@@ -20,6 +20,12 @@ export function keepOpenOnOutsideInteraction(e: { preventDefault(): void }): voi
   e.preventDefault();
 }
 
+/** Fokus aufs Panel selbst statt aufs X (Dialog-Regel). */
+export function focusPanelItself(e: { preventDefault(): void; currentTarget: unknown }): void {
+  e.preventDefault();
+  (e.currentTarget as { focus?: () => void } | null)?.focus?.();
+}
+
 export interface SidePanelProps {
   open: boolean;
   onOpenChange(open: boolean): void;
@@ -41,6 +47,7 @@ export function SidePanel({ open, onOpenChange, title, description, children, ba
           data-efa-sidepanel=""
           {...dataAttributes}
           onInteractOutside={keepOpenOnOutsideInteraction}
+          onOpenAutoFocus={focusPanelItself}
           className={sidePanelClass(width)}
         >
           <div className="shrink-0 flex items-start justify-between gap-3 p-5 border-b border-[var(--color-border)]">
