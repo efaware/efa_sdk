@@ -1,7 +1,5 @@
 import React from 'react';
-import { Dialog } from './Dialog.js';
-import { Button } from './Button.js';
-import { Alert } from './Alert.js';
+import { ConfirmDialog } from './ConfirmDialog.js';
 
 export interface ConfirmDeleteDialogProps {
   open: boolean;
@@ -37,28 +35,22 @@ export function ConfirmDeleteDialog({
   labels,
 }: ConfirmDeleteDialogProps) {
   const text = description ?? (itemName ? `„${itemName}“ wird endgültig gelöscht.` : 'Der Eintrag wird endgültig gelöscht.');
+  // Dünner Wrapper auf ConfirmDialog; die Test-Markierungen bleiben genau wie bisher
+  // (der Klicktest von efa studio sucht `confirm-delete`).
   return (
-    <Dialog
+    <ConfirmDialog
       open={open}
-      onOpenChange={(o) => {
-        if (!o) onCancel();
-      }}
       title={title ?? 'Eintrag löschen?'}
-      size="sm"
+      description={text}
+      variant="danger"
+      busy={deleting}
+      error={error}
+      onErrorDismiss={onErrorDismiss}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      labels={{ cancel: labels?.cancel, confirm: labels?.confirm ?? 'Löschen' }}
+      confirmAction="confirm-delete"
       dataAttributes={{ 'data-efa-dialog': 'confirm-delete' }}
-      banner={error ? <Alert variant="error" onDismiss={onErrorDismiss}>{error}</Alert> : undefined}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onCancel} disabled={!!deleting} data-efa-action="cancel">
-            {labels?.cancel ?? 'Abbrechen'}
-          </Button>
-          <Button variant="danger" onClick={() => void onConfirm()} loading={!!deleting} data-efa-action="confirm-delete">
-            {labels?.confirm ?? 'Löschen'}
-          </Button>
-        </>
-      }
-    >
-      <p className="text-sm text-[var(--color-text-secondary)]">{text}</p>
-    </Dialog>
+    />
   );
 }

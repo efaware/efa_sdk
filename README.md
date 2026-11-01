@@ -281,6 +281,20 @@ Excel export for such data. No backend or kernel change.
   scrollbar sits above the table and scrolls in sync with the bottom one. Not on
   mobile. The border moved to an outer wrapper.
 
+**1.30.0 — detail pages and confirmations.** No kernel or backend change.
+- New components in `@efa-one/sdk/frontend/ui`: `Tabs` + `TabPanel` (tab strip with
+  arrow-key navigation, badges, `data-efa-tab`), `SidePanel` (non-modal panel on the
+  right; clicks on the page behind it do not close it), `ConfirmDialog` (any
+  confirmation, replaces `window.confirm`) and `DateTimeField` (`TT.MM.JJJJ HH:MM`
+  instead of `datetime-local`, with `parseDateTimeDe`/`maskDateTimeInput`).
+- `ConfirmDeleteDialog` is now a thin wrapper around `ConfirmDialog`; its markers stay
+  `confirm-delete`. Its initial focus is on „Abbrechen“, so Enter no longer deletes.
+- `Dialog` focuses the first input on open (`initialFocus`: `first-field` default,
+  `primary`, `cancel`, `close`); before, the focus ring sat on the X. The X has
+  `aria-label="Schließen"`.
+- Template rules „Dialoge“: one way to close, at most three footer buttons, no
+  dialog on top of a dialog.
+
 **1.29.0 — UI reference for coding agents.** No kernel, backend or runtime change.
 - The package ships `frontend/ui/REFERENCE.md`: every export of `@efa-one/sdk/frontend/ui`
   with its props and JSDoc, one section per module plus a contents list. It is generated

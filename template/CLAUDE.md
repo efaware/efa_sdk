@@ -590,6 +590,10 @@ Bestands-Apps auf Tailwind v3 tragen den Pfad stattdessen in `content` der
 | `RecordDialog` | **Pflicht** für Detail-Ansichten von Listen-Einträgen (siehe „Detail-Dialog-Pattern" weiter unten). Breite wie beim `Dialog` über `size` (Default 768 px). |
 | `useRecords` | Fertiger Ablauf für CRUD-Listen (laden, anlegen, bearbeiten, löschen) zu `RecordDialog` + `ConfirmDeleteDialog`. Statt eigener `save()`-Funktionen. |
 | `ConfirmDeleteDialog` | Bestätigung vor dem Löschen (`size="sm"`, Fehlerbanner). |
+| `ConfirmDialog` | Jede andere Rückfrage (Deaktivieren, Trennen, Widerrufen). Ersetzt `window.confirm`; `variant="danger"` (Vorgabe) setzt den Fokus auf „Abbrechen“. |
+| `Tabs` + `TabPanel` | Reiter einer **Detailseite** (Objekt mit Unterlisten). Nicht im Dialog. |
+| `SidePanel` | Detail eines Listeneintrags rechts neben der Liste (nicht modal, Liste bleibt bedienbar), etwa ein Dokumenttext. |
+| `DateTimeField` | Datum + Uhrzeit als `TT.MM.JJJJ HH:MM`. Nie `<input type="datetime-local">` (zeigt je nach Browser `mm/dd/yyyy`). |
 | `DropdownMenu` | Context menus, "more" menus (MoreHorizontal icon). |
 | `Tooltip` | Hints on icon-only buttons. |
 | `EmptyState` | Every list/table that can have zero items. |
@@ -647,6 +651,24 @@ Das gilt für:
 - Tag-/Slug-Normalisierung (siehe `helpers/normalize.ts`-Pattern)
 
 **Häufige Verstöße bei Claude:** „Schliessen" statt „Schließen", „muessen" in Hinweistexten, „Aenderung" in Toast-Messages. Vor jedem User-facing String ein Kontroll-Blick.
+
+## Dialoge (Pflicht)
+
+1. **Genau ein Schließen-Weg.** Lese-Dialoge: nur das X oben (und Escape). Formulare:
+   „Abbrechen“ + Primäraktion; das X ist dasselbe wie „Abbrechen“. Kein zusätzliches
+   „Schließen“ in der Fußzeile, wenn es das X gibt.
+2. **Höchstens drei Elemente in der Fußzeile.** Weitere Aktionen in ein „…“-
+   `DropdownMenu`. Destruktives steht nie neben der Primäraktion, sondern im Menü
+   (`variant="danger"`) und fragt über `ConfirmDialog` nach.
+3. **Kein `window.confirm`, kein `alert`.** Rückfragen über `ConfirmDialog` bzw.
+   `ConfirmDeleteDialog`, Fehler als `Alert` im `banner`.
+4. **Kein Dialog über Dialog.** Braucht ein Dialog einen zweiten (Liste, Protokoll,
+   Volltext), ist der erste eine Seite: Detailseite mit `Tabs`, Einzelansicht im
+   `SidePanel`. Ausnahme: die kurze Rückfrage (`ConfirmDialog`).
+5. **Breiten:** Formulare `2xl`, Lese-Ansichten `3xl`, Rückfragen `sm`. Listen und
+   Volltexte gehören nie in einen Dialog.
+6. **Fokus beim Öffnen** auf das erste Feld (Vorgabe von `Dialog`), bei Rückfragen
+   auf „Abbrechen“; nie auf das X.
 
 ## Page-Layout — zentrierte Container (Pflicht)
 
@@ -720,6 +742,10 @@ das ist **kein** seitenweiter Header und bleibt erlaubt. Nur ein expliziter User
 Jede Liste, deren Einträge bearbeitet werden können, **muss** dieses einheitliche
 Read-/Edit-Verhalten implementieren. `RecordDialog` + `useRecords` aus
 `@efa-one/sdk/frontend/ui` kapseln es bereits.
+
+**Ausnahme: Objekte mit Unterlisten** (ein Silo mit Dokumenten und Quellen, ein
+Server mit Tools) bekommen statt `RecordDialog` eine **Detailseite** mit `Tabs`
+(Zeilenklick navigiert, Browser-Zurück führt zur Liste). Siehe „Dialoge“, Regel 4.
 
 **UX-Vertrag:**
 
