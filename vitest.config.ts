@@ -53,6 +53,14 @@ const perFileThresholds = {
   // Records-Ablauf (useRecords): jede Aktion löst genau ihre Anfrage aus. Ist L 100 / S 97 / F 100 / B 85.7.
   'src/frontend/ui/records.ts': { lines: 99, statements: 96, functions: 100, branches: 85 },
   'src/frontend/format.ts': { lines: 100, statements: 100, functions: 100, branches: 90 },
+  // 1.30 Bausteine für Detailseiten und Rückfragen (Silo-Überarbeitung efa-ai).
+  // Reine Logik voll abgedeckt; Tabs/DateTimeField: Event-Handler ohne DOM ungetestet.
+  'src/frontend/ui/ConfirmDialog.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+  'src/frontend/ui/ConfirmDeleteDialog.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+  'src/frontend/ui/SidePanel.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+  'src/frontend/ui/dateTimeInput.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
+  'src/frontend/ui/Tabs.tsx': { lines: 72, statements: 72, functions: 69, branches: 90 },
+  'src/frontend/ui/DateTimeField.tsx': { lines: 60, statements: 63, functions: 50, branches: 63 },
 };
 
 // Die Config wird immer aus dem Paket-Root geladen (npm test läuft dort).

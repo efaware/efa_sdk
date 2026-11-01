@@ -25,6 +25,49 @@ interface DialogProps {
    * von efa studio sie erkennt.
    */
   dataAttributes?: Record<`data-${string}`, string | undefined>;
+  /** Fokus beim Öffnen: erstes Feld sonst Dialog (Vorgabe), `primary`/`cancel` (Fußzeile), `close` (X). */
+  initialFocus?: DialogInitialFocus;
+}
+
+export type DialogInitialFocus = 'first-field' | 'primary' | 'cancel' | 'close';
+
+/** Minimal, damit die Auswahl ohne DOM testbar ist. */
+interface Queryable {
+  querySelectorAll(selector: string): ArrayLike<unknown>;
+}
+
+const FIELD_SELECTOR = 'input:not([type=hidden]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]):not([readonly])';
+const BUTTON_SELECTOR = 'button:not([disabled])';
+
+/** Sichtbar und damit fokussierbar (keine `display:none`-Dateifelder, keine zugeklappten Bereiche). */
+function isVisible(el: unknown): boolean {
+  const e = el as { getClientRects?: () => ArrayLike<unknown> };
+  return typeof e.getClientRects !== 'function' || e.getClientRects().length > 0;
+}
+
+/** Fokus auf den Dialog selbst (ohne Ring): weder Feld noch X, Enter löst nichts aus. */
+export const FOCUS_CONTENT = 'content' as const;
+
+/**
+ * Ziel des Fokus beim Öffnen: ein Element, `FOCUS_CONTENT` oder `null` (Radix: das X).
+ * `first-field` nimmt das erste sichtbare Feld, sonst den Dialog selbst — nie einen
+ * Knopf, denn der letzte ist oft „Löschen“. `primary`/`cancel`: letzter/erster
+ * Knopf der Fußzeile.
+ */
+export function pickInitialFocus(
+  mode: DialogInitialFocus,
+  body: Queryable | null,
+  footer: Queryable | null,
+  visible: (el: unknown) => boolean = isVisible,
+): unknown {
+  if (mode === 'close') return null;
+  if (mode === 'first-field') {
+    const fields = Array.from(body?.querySelectorAll(FIELD_SELECTOR) ?? []);
+    return fields.find(visible) ?? FOCUS_CONTENT;
+  }
+  const buttons = Array.from(footer?.querySelectorAll(BUTTON_SELECTOR) ?? []).filter(visible);
+  if (buttons.length === 0) return FOCUS_CONTENT;
+  return mode === 'cancel' ? buttons[0] : buttons[buttons.length - 1];
 }
 
 export type DialogSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
@@ -49,7 +92,16 @@ export function dialogWidthClass(size: DialogSize = DEFAULT_DIALOG_SIZE): string
   return `w-[calc(100%-2rem)] ${SIZE_CLASS[size]}`;
 }
 
-export function Dialog({ open, onOpenChange, trigger, title, description, children, banner, footer, size = DEFAULT_DIALOG_SIZE, dataAttributes }: DialogProps) {
+export function Dialog({ open, onOpenChange, trigger, title, description, children, banner, footer, size = DEFAULT_DIALOG_SIZE, dataAttributes, initialFocus = 'first-field' }: DialogProps) {
+  const bodyRef = React.useRef<HTMLDivElement>(null);
+  const footerRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  const onOpenAutoFocus = (e: Event) => {
+    const target = pickInitialFocus(initialFocus, bodyRef.current, footerRef.current);
+    if (target === null) return;
+    e.preventDefault();
+    (target === FOCUS_CONTENT ? contentRef.current : (target as HTMLElement))?.focus();
+  };
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       {trigger && <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger>}
@@ -76,6 +128,8 @@ export function Dialog({ open, onOpenChange, trigger, title, description, childr
         */}
         <RadixDialog.Content
           {...dataAttributes}
+          ref={contentRef}
+          onOpenAutoFocus={onOpenAutoFocus}
           className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 ${dialogWidthClass(size)} flex flex-col max-h-[90vh] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95`}
         >
           {/* Header */}
@@ -90,7 +144,7 @@ export function Dialog({ open, onOpenChange, trigger, title, description, childr
                 </RadixDialog.Description>
               )}
             </div>
-            <RadixDialog.Close className="ml-4 p-1 rounded-full text-[var(--color-text-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-text-primary)] transition-colors">
+            <RadixDialog.Close aria-label="Schließen" className="ml-4 p-1 rounded-full text-[var(--color-text-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-text-primary)] transition-colors">
               <X className="w-4 h-4" />
             </RadixDialog.Close>
           </div>
@@ -99,11 +153,11 @@ export function Dialog({ open, onOpenChange, trigger, title, description, childr
           {banner && <div className="shrink-0 px-5 pt-5">{banner}</div>}
 
           {/* Body — der einzige scrollende Bereich */}
-          <div className="min-h-0 overflow-y-auto p-5">{children}</div>
+          <div ref={bodyRef} className="min-h-0 overflow-y-auto p-5">{children}</div>
 
           {/* Footer */}
           {footer && (
-            <div className="shrink-0 flex items-center justify-end gap-2 px-5 pb-5">
+            <div ref={footerRef} className="shrink-0 flex items-center justify-end gap-2 px-5 pb-5">
               {footer}
             </div>
           )}
