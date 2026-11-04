@@ -20,7 +20,8 @@ router.get('/', (_req: Request, res: Response) => {
     openapi: '3.0.3',
     info: {
       title: appName,
-      description: 'Kurzbeschreibung dieser App (1-2 Sätze, was die App tut).',
+      // Text unter dem Namen auf der Kachel: ca. 3 Wörter, kein Satz (z. B. „Mietrenditen ermitteln“).
+      description: 'Kachelbeschreibung',
       version: '1.0.0',
     },
     'x-converge': {

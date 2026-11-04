@@ -1430,6 +1430,11 @@ Damit das funktioniert, **muss** jede Template-App `/api/openapi.json` anbieten.
 | `default_app_type` | nein | `internal` (iframe, Default), `network` (neuer Tab, gleiche Infra), `external` (externes Weblink). |
 | `default_permissions` | nein | Rein informativ: Liste der Permission-Objekte, die die App über `registerPermissions()` meldet. Der Kernel gibt sie beim Install nur im Response zurück und legt **nichts** an — angelegt wird beim App-Start über `registerPermissions()`. Synchron zu `backend/src/index.ts` halten. |
 
+**Kachelbeschreibung = `info.description`.** Der Kernel übernimmt sie beim Installieren als
+Text unter dem Namen auf der Kachel. Deshalb **ca. 3 Wörter, kein Satz, kein Punkt**:
+„Mietrenditen ermitteln“, „Betriebskostenabrechnung“, „Schlüssel- und Zugangsverwaltung“.
+Die ausführliche Beschreibung für den KI-Agenten gehört in `registerApiMetadata({ description })`.
+
 ### Spec aktuell halten
 
 Beim Hinzufügen eigener Routen den `paths`-Block ergänzen (mindestens `summary` + Response-Codes). Damit:
