@@ -4,6 +4,10 @@ All notable changes to this template will be documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`onUserDeleted` (`@efa-one/sdk` 1.31) in `CLAUDE.md`.** Jede App entfernt die Daten gelöschter Benutzer über die Tombstone-Liste des Kernels. Das Scaffold verdrahtet den Aufruf, sobald es auf 1.31 zeigt.
+
 ### Changed
 
 - **Sprechende URLs sind Vorgabe (11.11.2026).** `App.tsx` nutzt `HashRouter` statt `BrowserRouter` und meldet jede innere Route per `notifyRouteChange` an den Kernel: der Link `#/app/<serviceKey>/<pfad>` ist teilbar, übersteht F5 und öffnet die App direkt auf der Seite. Geschäftsobjekte öffnen sich auf einer **Detailseite unter ihrer Nummer** (`/<kürzel>/<nummer>/`, Anlegen `/<kürzel>/neu/`) statt im `RecordDialog`; der Dialog bleibt für kleine Einträge ohne eigene Adresse. `CLAUDE.md` hat den neuen Abschnitt „Sprechende URLs und Detailseiten“ (Pfadregeln, Seite oder Dialog, UX-Vertrag, Gerüst), Frage 0 (b), die Intake-DoD und `docs/intake.md` verweisen darauf. Widget-Pfad einer Kachel ist damit `#/widget` (`docs/ARCHITECTURE.md`). Beispiel: Geschäftspartner unter `/bp/0000010100/`.

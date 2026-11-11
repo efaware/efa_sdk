@@ -270,6 +270,41 @@ Exchange klappt also. Jeder `requireAuth`-geschützte Request braucht aber den
 Kernel-Endpoint und antwortet ohne laufenden Stack mit 503 — für geschützte Routen
 den vollständigen Stack lokal starten (`CONVERGE_GATEWAY_URL` + `SERVICE_AUTH_KEY`).
 
+### Gelöschte Benutzer: `onUserDeleted` (Pflicht, ab `@efa-one/sdk` 1.31)
+
+Löscht ein Admin im Kernel einen Benutzer, muss jede App dessen Daten entfernen
+(DSGVO Art. 17, Löschkonzept 8.3). Der Kernel führt dafür eine Tombstone-Liste
+(nur UUID und Zeitpunkt, 90 Tage). `onUserDeleted` holt sie beim Start ab seq 0
+und danach alle 10 min, und ruft den Handler mit den Converge-User-UUIDs auf.
+Eine App, die bei der Löschung nicht lief oder aus einer Sicherung kommt, holt
+die Löschung so beim nächsten Start nach.
+
+```ts
+import { onUserDeleted } from '@efa-one/sdk/backend';
+
+// in startServer(), nach initDb()
+onUserDeleted(async (convergeIds) => {
+  // Persönliches zuerst (Tabellen ohne FK auf app_users), dann app_users selbst.
+  await pool.query('DELETE FROM app_users WHERE converge_id = ANY($1)', [convergeIds]);
+});
+```
+
+Regeln für den Handler:
+- **Idempotent.** Nach jedem Neustart kommen alle Tombstones der letzten 90 Tage
+  erneut, auch für Personen, die die App nie kannte.
+- **Was gehört wem?** Persönliche Daten (Entwürfe, private Einträge, Ansichten,
+  Verläufe) löschen. Firmendaten, die die Person nur angelegt hat (Datensätze,
+  veröffentlichte Inhalte), bleiben: `owner_id` wird per `ON DELETE SET NULL` leer.
+  Tabellen mit `owner_id … ON DELETE CASCADE` räumt das Löschen von `app_users` mit ab.
+- **Wirft der Handler, kommt dieselbe Seite beim nächsten Lauf erneut.** Daher in
+  einer Transaktion löschen.
+- **Gesetzliche Aufbewahrung** (unveränderbare Protokolle) nicht löschen, sondern
+  in der README begründen.
+- Kernel ohne Endpoint (vor 11/2026) → 404, die Hilfe versucht es leise später erneut.
+  Es gilt also keine Rollout-Reihenfolge wie bei 1.17.
+- War die App länger als 90 Tage gestoppt, fehlen ältere Löschungen. Dann das
+  Lösch-Journal nachziehen (Löschkonzept 8.3/8.4).
+
 ### Exchange, Cookie und Service-Aufrufe ab `@efa-one/sdk` 1.23
 
 **Exchange-Vorfilter (efa #282).** `POST /api/auth/exchange` tauscht nur noch Login-

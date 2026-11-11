@@ -17,6 +17,7 @@ export * from './notifications';
 export * from './permissions';
 export * from './permissionClient';
 export * from './sessionStatusClient';
+export * from './userDeletions';
 export * from './permissionCheck';
 export * from './platformAdmin';
 export * from './customPermissions';
