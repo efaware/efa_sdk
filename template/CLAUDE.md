@@ -459,7 +459,7 @@ das mit. Antworten in `docs/intake.md §0` eintragen.
 | Antwort | Umsetzung |
 |---|---|
 | (a) Werkzeug | Eine Seite mit Eingabe und Ergebnis. Keine Tabelle in der Datenbank für Fachdaten, keine `DataTable`. Frage 2 und Frage 4 meist `↪ entfällt (Werkzeug)`. |
-| (b) Verwaltung | Je genanntem Ding: Tabelle in `schema.sql` (mit `tenant`, ggf. `owner_id`), Routen zum Auflisten, Lesen, Anlegen, Ändern, Löschen, Übersicht als `DataTable` (siehe „Listen-Verhalten") und Einzelansicht per `RecordDialog` (siehe „Detail-Dialog-Pattern"). `reportEvent` nach jedem Schreibvorgang. |
+| (b) Verwaltung | Je genanntem Ding: Tabelle in `schema.sql` (mit `tenant`, ggf. `owner_id`), Routen zum Auflisten, Lesen, Anlegen, Ändern, Löschen, Übersicht als `DataTable` (siehe „Listen-Verhalten") und Einzelansicht als **Detailseite unter sprechender URL** `/<kürzel>/<nummer>/` (siehe „Sprechende URLs und Detailseiten"); `RecordDialog` nur für kleine Einträge ohne eigene Adresse. `reportEvent` nach jedem Schreibvorgang. |
 | (c) Werkzeug mit Verlauf | Die Werkzeug-Seite plus eine Vorgangs-Tabelle (Zeitpunkt, ausgelöst von, kurze Beschreibung der Eingabe, Ergebnis/Status, Fehlertext). Übersicht der Vorgänge als `DataTable`, Einzelansicht nur lesend. Fehlgeschlagene Vorgänge sichtbar markieren. |
 
 
@@ -517,7 +517,9 @@ Eine App ist „fachlich vollständig" wenn:
 
 - Frage 0 vom User **ausdrücklich** beantwortet ist (nicht von dir abgeleitet)
 - bei Frage 0 = (b): für jedes genannte Ding Übersicht (`DataTable`), Einzelansicht
-  (`RecordDialog`) und Speichern in der App-Datenbank existieren
+  (Detailseite unter `/<kürzel>/<nummer>/`, bei kleinen Einträgen `RecordDialog`) und
+  Speichern in der App-Datenbank existieren
+- jede Seite hat einen sprechenden Pfad und übersteht F5 (`HashRouter` + `notifyRouteChange`)
 - bei Frage 0 = (c): Vorgangs-Tabelle + Verlaufsübersicht existieren
 - alle 9 Pflichtfragen in `docs/intake.md` Status ≥ `✅ beantwortet` haben (oder bei
   Frage 0 = (a) begründet `↪ entfällt`)
@@ -622,7 +624,7 @@ Bestands-Apps auf Tailwind v3 tragen den Pfad stattdessen in `content` der
 | `Badge` | Status labels — variants: `success`, `warning`, `danger`, `neutral`. |
 | `Alert` | Fehler-/Status-**Banner** in Formularen/Dialogen — variants: `error`, `success`, `warning`, `info`; ab SDK 1.25 immer mit „×" oben rechts (ohne `onDismiss` blendet es sich selbst aus — nur für feste Hinweise; Meldungen aus App-State immer mit `onDismiss`, sonst bleibt derselbe Fehler nach dem Schließen verborgen; `dismissible={false}` schaltet das „×" ab). Nie handgerollt (Kontrast-Falle, siehe Regel unten). |
 | `Dialog` | Confirmations, forms in modal. Always use for destructive actions. Breite über `size` (`sm`…`5xl`, Default `3xl` = 768 px, seit SDK 1.24) — nicht per `className` überschreiben. Kurze Bestätigungen („Wirklich löschen?“) mit `size="sm"`, sonst stehen zwei Zeilen Text in einem 768 px breiten Kasten. **Höhe** ist auf `90vh` gedeckelt: der Body scrollt, Header und Footer stehen fest — Formulare dürfen also beliebig lang werden, der Speichern-Button bleibt erreichbar. Ein Banner, das beim Scrollen sichtbar bleiben muss (Fehler/Validierung), gehört in den `banner`-Slot, **nicht** in `children`. |
-| `RecordDialog` | **Pflicht** für Detail-Ansichten von Listen-Einträgen (siehe „Detail-Dialog-Pattern" weiter unten). Breite wie beim `Dialog` über `size` (Default 768 px). |
+| `RecordDialog` | Lesen/Bearbeiten **kleiner Einträge ohne eigene Adresse** (Einstellungen, Kataloge, Unterpositionen). Geschäftsobjekte bekommen eine Detailseite mit sprechender URL (siehe „Sprechende URLs und Detailseiten"). Breite wie beim `Dialog` über `size` (Default 768 px). |
 | `useRecords` | Fertiger Ablauf für CRUD-Listen (laden, anlegen, bearbeiten, löschen) zu `RecordDialog` + `ConfirmDeleteDialog`. Statt eigener `save()`-Funktionen. |
 | `ConfirmDeleteDialog` | Bestätigung vor dem Löschen (`size="sm"`, Fehlerbanner). |
 | `ConfirmDialog` | Jede andere Rückfrage (Deaktivieren, Trennen, Widerrufen). Ersetzt `window.confirm`; `variant="danger"` (Vorgabe) setzt den Fokus auf „Abbrechen“. |
@@ -772,15 +774,105 @@ Export, „+ Neu", Aktualisieren …) in einen **fixierten Footer** unten. Muste
 das ist **kein** seitenweiter Header und bleibt erlaubt. Nur ein expliziter User-Wunsch
 („mach mir hier einen Header") rechtfertigt eine eigene Kopfleiste.
 
-## Detail-Dialog-Pattern (Pflicht für CRUD-Listen)
+## Sprechende URLs und Detailseiten (Pflicht, seit 11.11.2026)
 
-Jede Liste, deren Einträge bearbeitet werden können, **muss** dieses einheitliche
-Read-/Edit-Verhalten implementieren. `RecordDialog` + `useRecords` aus
-`@efa-one/sdk/frontend/ui` kapseln es bereits.
+Jede Ansicht, die jemand teilen, als Lesezeichen speichern oder nach F5 wiederfinden
+will, hat einen **eigenen, lesbaren Pfad**. Das ist die Vorgabe für alle efa-Apps.
+Ein Geschäftsobjekt öffnet sich deshalb auf einer **eigenen Seite unter seiner Nummer**,
+nicht in einem Dialog. Beispiel: Geschäftspartner unter `/bp/0000010100/`.
 
-**Ausnahme: Objekte mit Unterlisten** (ein Silo mit Dokumenten und Quellen, ein
-Server mit Tools) bekommen statt `RecordDialog` eine **Detailseite** mit `Tabs`
-(Zeilenklick navigiert, Browser-Zurück führt zur Liste). Siehe „Dialoge“, Regel 4.
+**Technik (liefert das Template, nicht ändern):** `HashRouter` plus
+`notifyRouteChange(location.pathname)` in `App.tsx`. Der Kernel zeigt die innere Route als
+`https://<instanz>/#/app/<serviceKey>/<pfad>` in seiner Adresszeile, öffnet die App beim
+Aufruf des Links direkt dort und reicht den Pfad als Hash ins iframe
+(`/apps/<serviceKey>/#/<pfad>`). Ein `BrowserRouter` verliert den Pfad, und ohne
+`notifyRouteChange` steht in der Adresszeile nur die App. Andere Apps springen mit
+`navigateToApp('<serviceKey>', { path: '/<kürzel>/<nummer>/' })` direkt auf ein Objekt.
+Der Widget-Pfad einer Kachel lautet entsprechend `#/widget`.
+
+**Pfade bilden:**
+
+| Ansicht | Pfad | Beispiel |
+|---|---|---|
+| Übersicht (Startseite) | `/` | Partnerliste |
+| Detailseite | `/<kürzel>/<fachlicher Schlüssel>/` | `/bp/0000010100/`, `/vertrag/V-2026-0042/` |
+| Anlegen | `/<kürzel>/neu/` | `/bp/neu/` |
+| Sektion, Einstellungen | `/<bereich>[/<unterbereich>]` | `/settings/rollen` |
+
+- Kürzel klein, kurz, fachlich (`bp` für Geschäftspartner, `vertrag`, `geraet`), ohne
+  Umlaute. Keine generischen Wörter wie `/item/` oder `/detail/`.
+- Schlüssel ist die **Nummer, die Menschen kennen** (Partner-, Vertrags-,
+  Rechnungsnummer). Eine UUID nur, wenn das Objekt keine Nummer hat. Für den Abruf über
+  die Nummer bekommt das Backend einen Endpunkt `GET /api/<objekte>/by-number/:nummer`.
+- Alle Pfade an **einer** Stelle (`frontend/src/lib/routes.ts`) als Funktionen
+  (`partnerPath(nummer)`); kein Pfad als String-Literal in Komponenten.
+- Nach F5 auf jeder Seite steht dieselbe Seite wieder da. Filter oder Reiter dürfen,
+  müssen aber nicht in die URL.
+
+**Wann Seite, wann Dialog:**
+
+- **Eigene Seite:** Geschäftsobjekte mit eigener Nummer, mit Reitern oder mit Unterlisten
+  (Partner mit Adressen und Ansprechpartnern, Vertrag mit Positionen, Silo mit Dokumenten).
+- **`RecordDialog`** (siehe „Detail-Dialog" unten) nur für kleine Einträge **ohne eigene
+  Adresse**: Einstellungen, Kataloge (Rollentypen, Kategorien), Unterpositionen auf einer
+  Detailseite (eine Adresse des Partners).
+
+**UX-Vertrag der Detailseite** (gleich wie beim Dialog, nur als Seite):
+
+1. Klick auf eine Listen-Zeile navigiert auf `/<kürzel>/<nummer>/`. Die Seite öffnet
+   **lesend** (Label-Wert-Liste).
+2. Titel (Nummer, Name, Status-Badge) links im **fixierten Footer**, Aktionen rechts
+   (siehe „Kein App-Header"): lesend „Bearbeiten" (`Pencil`) plus „Weitere" (`…`-Menü mit
+   Archivieren, Löschen); bearbeitend „Anzeigen" (`Eye`, verwirft Eingaben) und
+   „Speichern". Kein Auto-Save.
+3. „+ Neu" in der Übersicht navigiert auf `/<kürzel>/neu/`. Nach dem Anlegen
+   `navigate(<neuer Pfad>, { replace: true })`, damit „Zurück" nicht im leeren Formular landet.
+4. Zurück führt über den Kernel-Pfeil (`CONVERGE_GO_BACK` → `navigate('/')`) zur Übersicht.
+   Kein eigener Zurück-Button.
+5. Unbekannte Nummer → `EmptyState` „<Objekt> <nummer> nicht gefunden" mit Button zur
+   Übersicht. Kurzform der Nummer (`/bp/10100/`) auf die volle Form ersetzen
+   (`replace: true`), nicht doppelt laden.
+6. `/<kürzel>/neu/` ohne Schreibrecht → `<Navigate to="/" replace />`.
+7. Fehlerbanner als `Alert` **über** dem scrollenden Bereich (`shrink-0`), wie beim Dialog.
+8. Test-Markierungen: `data-efa-page="record"` und `data-efa-mode` am Seiten-Container,
+   `data-efa-action="edit" | "view" | "save" | "cancel"` an den Footer-Buttons.
+
+```tsx
+// App.tsx
+<Route path="/" element={<ItemsPage user={user} />} />
+<Route path="/vertrag/:number" element={<ItemPage user={user} />} />
+
+// lib/routes.ts
+export const itemPath = (nr: string) => `/vertrag/${encodeURIComponent(nr)}/`;
+export const NEW_ITEM_PATH = itemPath('neu');
+
+// ItemsPage.tsx: Übersicht navigiert nur
+<DataTable … onRowClick={(it) => { void navigate(itemPath(it.number)); }} />
+
+// ItemPage.tsx: Gerüst
+const { number = '' } = useParams<{ number: string }>();
+const isNew = number === 'neu';
+// lädt per GET /api/items/by-number/:number, 404 → „nicht gefunden"
+<div className="flex flex-col h-full" data-efa-page="record" data-efa-mode={mode}>
+  {error && <div className="shrink-0 px-6 pt-4"><div className="max-w-4xl mx-auto"><Alert variant="error" onDismiss={() => setError('')}>{error}</Alert></div></div>}
+  <div className="flex-1 overflow-auto"><div className="p-6 max-w-4xl mx-auto">{/* Tabs + Inhalt */}</div></div>
+  <footer className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-3 flex items-center justify-between gap-4">
+    <div>{/* Nummer, Name, Badge */}</div>
+    <div className="flex items-center gap-2">{/* Bearbeiten | Anzeigen + Speichern | Abbrechen + Anlegen */}</div>
+  </footer>
+</div>
+```
+
+Die Übersicht lädt weiter mit `useRecords` (nur `rows`, `loading`, `loadError`, `reload`);
+Anlegen, Bearbeiten und Löschen laufen auf der Detailseite.
+
+## Detail-Dialog (für kleine Einträge ohne eigene Adresse)
+
+Geschäftsobjekte bekommen eine **Detailseite** mit sprechender URL (siehe „Sprechende URLs
+und Detailseiten" oben). Der Dialog bleibt für kleine Einträge ohne eigene Adresse:
+Einstellungen, Kataloge, Unterpositionen auf einer Detailseite. Wo er verwendet wird,
+**muss** er dieses einheitliche Read-/Edit-Verhalten implementieren. `RecordDialog` +
+`useRecords` aus `@efa-one/sdk/frontend/ui` kapseln es bereits.
 
 **UX-Vertrag:**
 
@@ -797,8 +889,8 @@ Server mit Tools) bekommen statt `RecordDialog` eine **Detailseite** mit `Tabs`
 
 - Verhindert versehentliche Edits durch Mis-Clicks.
 - Macht Werte überall einsehbar, auch wenn der User keine Edit-Permission hat.
-- Eine einzige Modal-Komponente pro Eintrag — kein Wechsel zwischen Detail-Page
-  und Edit-Page, der den Listen-Scroll verliert.
+- Eine Komponente je Eintrag für Lesen und Bearbeiten, kein Wechsel zwischen Lese- und
+  Bearbeiten-Seite (gilt genauso für die Detailseite).
 
 **Verwendung (`useRecords` + `RecordDialog`, ab SDK 1.26):**
 
@@ -1358,7 +1450,9 @@ JWT-Caching.
 
 ## efa-one IPC – Navigation
 
-Die Template-`App.tsx` implementiert das korrekte zweistufige Navigationsprotokoll:
+Die Template-`App.tsx` implementiert das korrekte zweistufige Navigationsprotokoll und
+meldet jede innere Route per `notifyRouteChange` an den Kernel (sprechende URLs, siehe
+„Sprechende URLs und Detailseiten"):
 
 ### CONVERGE_GO_BACK (zweistufig – NICHT direkt `sendAtStart` aufrufen)
 

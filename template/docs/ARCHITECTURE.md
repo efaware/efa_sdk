@@ -252,9 +252,9 @@ window.addEventListener('message', (event) => {
 
 > **Two-step back navigation (important):** `CONVERGE_GO_BACK` means "go one step back in the app". It does NOT mean "close the embedded view". Only `CONVERGE_AT_START` (sent via `sendAtStart()`) signals efa-one to return to the dashboard. If you handle `CONVERGE_GO_BACK` by always calling `navigate('/')`, the back button stops working once the user is already on `/` — the app stays open with no way to return to the dashboard.
 
-### Dashboard widget tiles (`/widget` route)
+### Dashboard widget tiles (`#/widget` route)
 
-When a tile has a **widget path** (e.g. `/widget`), efa-one embeds that route in a small iframe. The dashboard keeps those iframes mounted when you switch to settings or full-screen app view, so widgets do not reload on every return.
+When a tile has a **widget path**, efa-one embeds that route in a small iframe. The app uses a `HashRouter` (speaking URLs, see `CLAUDE.md` → „Sprechende URLs"), so the widget path of the tile is **`#/widget`**, not `/widget` (a plain `/widget` would load the app's start page). The dashboard keeps those iframes mounted when you switch to settings or full-screen app view, so widgets do not reload on every return.
 
 **Tile click → open app (default):** On the dashboard grid, a widget tile is normally covered by a transparent control that opens the full app (same behavior as a non-widget tile). The iframe is not pointer-targetable until the widget opts in.
 

@@ -36,7 +36,7 @@ Beim Bearbeiten der App liest Claude diese Datei, BEVOR er Code schreibt — bea
 
 - Ableitung:
   - (a): eine Seite Eingabe/Ergebnis, keine Fachtabellen
-  - (b): je Ding Tabelle in `schema.sql`, Routen, Übersicht als `DataTable`, Einzelansicht per `RecordDialog`
+  - (b): je Ding Tabelle in `schema.sql`, Routen, Übersicht als `DataTable`, Einzelansicht als Detailseite unter `/<kürzel>/<nummer>/` (kleine Einträge ohne eigene Adresse: `RecordDialog`)
   - (c): Vorgangs-Tabelle + Verlaufsübersicht als `DataTable`, Einzelansicht nur lesend
 
 ---
