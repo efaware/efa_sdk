@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { sendAtStart, registerAppInfo, getParentOrigin, isFromPlatformParent } from '@efa-one/sdk/frontend/ipc';
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { sendAtStart, registerAppInfo, getParentOrigin, isFromPlatformParent, notifyRouteChange } from '@efa-one/sdk/frontend/ipc';
 import { useConvergeAuth } from './hooks/useConvergeAuth';
 import DevHeader from '@efa-one/sdk/frontend/DevHeader';
 import MainPage from './pages/MainPage';
@@ -12,7 +12,7 @@ import { TooltipProvider } from '@efa-one/sdk/frontend/ui';
 // (kernel alias, remove in Q1-2027). Mirrors PLATFORM_ADMIN_PERMISSIONS in the SDK.
 const PLATFORM_ADMIN_PERMISSIONS = ['efa-all', 'converge-admin'];
 
-// ─── Inner app (inside BrowserRouter, so useNavigate works) ──────────────────
+// ─── Inner app (inside HashRouter, so useNavigate works) ─────────────────────
 
 function InnerApp() {
   const { user, isReady, error } = useConvergeAuth();
@@ -27,6 +27,13 @@ function InnerApp() {
   // help-icon identity); `__APP_VERSION__` comes from the APP_VERSION Docker build arg
   // (GHCR tag) via vite.config.ts. registerAppInfo returns an unsubscribe for cleanup.
   useEffect(() => registerAppInfo({ appName: 'Template App', version: __APP_VERSION__ }), []);
+
+  // Speaking URLs (mandatory, see CLAUDE.md → „Sprechende URLs"): report every inner
+  // route to the kernel. It shows it as `#/app/<serviceKey>/<path>` in its address bar
+  // (shareable, bookmarkable, survives F5) and opens the app right there when someone
+  // follows the link. HashRouter is required for that: the kernel hands the inner path
+  // to the iframe as a hash (`/apps/<serviceKey>/#/<path>`).
+  useEffect(() => { notifyRouteChange(location.pathname); }, [location.pathname]);
 
   // Declare to Converge that this app has a settings page.
   // Only sent once auth is ready and the user is a platform admin — non-admins
@@ -116,9 +123,9 @@ function InnerApp() {
 export default function App() {
   return (
     <TooltipProvider>
-      <BrowserRouter>
+      <HashRouter>
         <InnerApp />
-      </BrowserRouter>
+      </HashRouter>
     </TooltipProvider>
   );
 }

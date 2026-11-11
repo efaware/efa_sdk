@@ -7,7 +7,9 @@ import { useRecords, DataTable, RecordDialog, ConfirmDeleteDialog, Button, Input
 import '@efa-one/sdk/frontend/ui/styles.css'; // once per app (Badge, Skeleton)
 ```
 
-Lists with create/edit/delete always use `useRecords`: spread `records.dialogProps` into `RecordDialog` and `records.deleteDialogProps` into `ConfirmDeleteDialog`; pass `records.openRecord` to `DataTable.onRowClick`. Never wire the dialog yourself.
+Business objects (own number, tabs or sub-lists) open on their own **detail page with a speaking URL** such as `/bp/0000010100/` (create: `/bp/neu/`), not in a dialog: the app uses `HashRouter` + `notifyRouteChange`, `DataTable.onRowClick` navigates, and `useRecords` only loads the list (see the template `CLAUDE.md` → „Sprechende URLs und Detailseiten"). Small entries without an address of their own (settings, catalogues, sub-items on a detail page) use `useRecords` with `RecordDialog`: spread `records.dialogProps` into `RecordDialog` and `records.deleteDialogProps` into `ConfirmDeleteDialog`; pass `records.openRecord` to `DataTable.onRowClick`. Never wire the dialog yourself.
+
+Detail pages set `data-efa-page="record"` and `data-efa-mode` on their container and `data-efa-action` on their footer buttons themselves.
 
 Never `window.confirm`/`alert`: use `ConfirmDialog` (or `ConfirmDeleteDialog`). Objects with sub-lists get a detail page with `Tabs`/`TabPanel` and `SidePanel` instead of nested dialogs. Date + time input: `DateTimeField`.
 
