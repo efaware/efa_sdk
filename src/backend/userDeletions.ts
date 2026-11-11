@@ -6,7 +6,7 @@
  * Handler der App mit den Converge-User-UUIDs auf:
  *
  *   GET converge_access /api/internal/user-deletions?after=<seq>
- *   → { items: [{ seq, userId, deletedAt }], next, hasMore, retentionDays }
+ *   → { items: [{ seq, userId, deletedAt }], next, hasMore, latestSeq, retentionDays }
  *
  * Usage (beim App-Start, nach dem DB-Init):
  *
@@ -25,6 +25,8 @@
  *     kommt dieselbe Seite beim nächsten Lauf wieder.
  *   - Ein Kernel ohne den Endpoint (404) oder ein Netzfehler sind kein Absturz:
  *     Die Hilfe protokolliert und versucht es beim nächsten Lauf erneut.
+ *   - Liegt `latestSeq` unter dem Cursor (Kernel-DB aus einer Sicherung), beginnt
+ *     die Hilfe wieder bei 0.
  *   - Läufe überlappen nicht; der Timer hält den Prozess nicht am Leben.
  */
 
@@ -53,6 +55,7 @@ interface DeletionsPage {
   items?: Array<{ seq?: unknown; userId?: unknown }>;
   next?: unknown;
   hasMore?: unknown;
+  latestSeq?: unknown;
 }
 
 const DEFAULT_INTERVAL_MS = 10 * 60_000;
@@ -63,6 +66,7 @@ const LOOKUP_TIMEOUT_MS = 15_000;
 /** Schutz gegen eine Endlosschleife, falls der Kernel `hasMore` nie zurücknimmt. */
 const MAX_PAGES_PER_RUN = 1_000;
 const SEQ_REGEX = /^\d{1,18}$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function log(level: string, msg: string, extra?: Record<string, unknown>): void {
   console.log(JSON.stringify({ level, msg, timestamp: new Date().toISOString(), ...extra }));
@@ -93,7 +97,17 @@ export function onUserDeleted(handler: UserDeletedHandler, options: UserDeletion
       if (!body || !Array.isArray(body.items) || typeof body.next !== 'string' || !SEQ_REGEX.test(body.next)) {
         throw new Error('onUserDeleted: unexpected response from converge_access');
       }
-      const ids = [...new Set(body.items.map((i) => i.userId).filter((id): id is string => typeof id === 'string' && id !== ''))];
+      // Kernel-DB aus einer Sicherung zurückgespielt: die Folge beginnt unterhalb des
+      // Cursors neu. Dann von vorn holen (der Handler ist idempotent).
+      if (typeof body.latestSeq === 'string' && SEQ_REGEX.test(body.latestSeq)
+          && BigInt(body.latestSeq) < BigInt(cursor)) {
+        log('warn', 'onUserDeleted: Tombstone-Folge des Kernels liegt unter dem Cursor, beginne bei 0', { cursor, latestSeq: body.latestSeq });
+        cursor = '0';
+        continue;
+      }
+      // Nur UUIDs: ein fremder Wert ließe einen `::uuid[]`-Handler bei jedem Lauf
+      // an derselben Seite scheitern, und der Cursor käme nie weiter.
+      const ids = [...new Set(body.items.map((i) => i.userId).filter((id): id is string => typeof id === 'string' && UUID_REGEX.test(id)))];
       if (ids.length > 0) {
         await handler(ids);
         total += ids.length;
