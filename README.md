@@ -68,6 +68,19 @@ app.use('/api/auth', createExchangeRouter());
 app.get('/api/items', requireAuth, handler);
 ```
 
+```ts
+// Backend — remove data of users deleted in the kernel (GDPR Art. 17)
+import { onUserDeleted } from '@efa-one/sdk/backend';
+
+onUserDeleted(async (convergeIds) => {
+  await pool.query('DELETE FROM app_users WHERE converge_id = ANY($1)', [convergeIds]);
+});
+```
+
+`onUserDeleted` reads the kernel's tombstone list (UUID and time only, kept 90 days)
+at startup from the beginning and every 10 minutes afterwards, so an app that was down
+or restored from a backup catches up. The handler must be idempotent.
+
 ```tsx
 // Frontend
 import { initI18n, registerAppInfo, DevHeader } from '@efa-one/sdk/frontend';

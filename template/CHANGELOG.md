@@ -4,6 +4,10 @@ All notable changes to this template will be documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`onUserDeleted` (`@efa-one/sdk` 1.31) in `CLAUDE.md`.** Jede App entfernt die Daten gelöschter Benutzer über die Tombstone-Liste des Kernels. Das Scaffold verdrahtet den Aufruf, sobald es auf 1.31 zeigt.
+
 ### Changed
 
 - **`.env.example` auf Produktionswerte (efa #290).** `ENVIRONMENT=production` (kein erreichbares `/dev/token` nach `cp .env.example .env`), `COOKIE_SECURE=true`, `CORS_ORIGINS` dokumentiert; die Dev-Werte stehen als Kommentar daneben. Neu: `APP_SESSION_SECRET_STRICT=true` (zu kurzes Secret bricht den Start ab) und der optionale `APP_SESSION_COOKIE_PATH`. `CLAUDE.md` und `docs/SECURITY.md` beschreiben Exchange-Vorfilter, Cookie-Pfad `/apps/<key>/`, `allowedCallers` und die Secret-Prüfung aus `@efa-one/sdk` 1.23. Der Test-Secret in `authExchange.test.ts` hat jetzt 32+ Byte.
