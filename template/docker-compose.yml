@@ -14,7 +14,7 @@ services:
     # Digest-Pin (Multi-Arch-Index) wie bei den Dockerfile-Base-Images: der Pull ist
     # reproduzierbar, Dependabot (Ökosystem docker-compose) zieht den Digest monatlich
     # nach. Die Major-Linie wechselt nie per Bot — siehe .github/dependabot.yml.
-    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    image: postgres:16-alpine@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139
     restart: unless-stopped
     # DB-Härtung bewusst reduziert: das offizielle postgres-Image startet als root,
     # chownt das Data-Dir und dropt via gosu auf den postgres-User — daher KEIN
