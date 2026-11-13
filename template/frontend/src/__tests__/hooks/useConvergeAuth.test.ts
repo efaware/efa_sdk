@@ -93,6 +93,7 @@ describe('useConvergeAuth (embedded mode)', () => {
       window.dispatchEvent(
         new MessageEvent('message', {
           source: window.parent,
+          origin: window.location.origin,
           data: {
             type: 'CONVERGE_AUTH',
             token: 'test-jwt',
@@ -131,6 +132,7 @@ describe('useConvergeAuth (embedded mode)', () => {
         window.dispatchEvent(
           new MessageEvent('message', {
             source: window.parent,
+            origin: window.location.origin,
             data: { type: 'CONVERGE_AUTH', token: 'test-jwt', theme: mockTheme, serviceKey: 'myapp' },
           }),
         );
@@ -158,6 +160,7 @@ describe('useConvergeAuth (embedded mode)', () => {
       window.dispatchEvent(
         new MessageEvent('message', {
           source: window.parent,
+          origin: window.location.origin,
           data: { type: 'CONVERGE_AUTH', token: 'bad-jwt', serviceKey: 'myapp' },
         }),
       );
@@ -190,6 +193,25 @@ describe('useConvergeAuth (embedded mode)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('ignores CONVERGE_AUTH from the parent with a foreign origin (SDK >= 1.23)', async () => {
+    const { result } = renderHook(() => useConvergeAuth());
+
+    // Richtiger Absender, aber fremde Origin: eine Seite, die die App über einen
+    // direkt erreichbaren Port einbettet. Der Kernel bettet nur same-origin ein.
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          source: window.parent,
+          origin: 'https://evil.example',
+          data: { type: 'CONVERGE_AUTH', token: 'attacker-jwt', theme: mockTheme, serviceKey: 'myapp' },
+        }),
+      );
+    });
+
+    expect(result.current.isReady).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('ignores CONVERGE_AUTH with a malformed serviceKey', async () => {
     const { result } = renderHook(() => useConvergeAuth());
 
@@ -197,6 +219,7 @@ describe('useConvergeAuth (embedded mode)', () => {
       window.dispatchEvent(
         new MessageEvent('message', {
           source: window.parent,
+          origin: window.location.origin,
           data: { type: 'CONVERGE_AUTH', token: 'jwt', theme: mockTheme, serviceKey: '../evil' },
         }),
       );
@@ -231,6 +254,7 @@ describe('useConvergeAuth (embedded mode)', () => {
       window.dispatchEvent(
         new MessageEvent('message', {
           source: window.parent,
+          origin: window.location.origin,
           data: { type: 'CONVERGE_AUTH', token: 'jwt', theme: mockTheme, serviceKey: 'myapp' },
         }),
       );

@@ -1,6 +1,6 @@
 # efa-one App Template
 
-efa-app-template-version: 1.15.0
+efa-app-template-version: 1.16.0
 
 ## What this is
 
@@ -37,7 +37,8 @@ What the SDK provides:
   date is forbidden (renders `1.9.2026`, or the browser locale's `9/1/2026`) and is caught by
   the `no-restricted-syntax` ESLint gate. Spec: DESIGN_SYSTEM.md → „Datum & Uhrzeit“
 - `@efa-one/sdk/frontend/DevHeader.tsx` – dev-mode header
-- `@efa-one/sdk/frontend/ui` – das efa-one-Design-System-Kit (Button, Dialog, DropdownMenu, Tooltip, Badge, Input, Switch, Alert, EmptyState, Skeleton, RecordDialog, **DataTable**) + `@efa-one/sdk/frontend/ui/styles.css`
+- `@efa-one/sdk/frontend/ui` – das efa-one-Design-System-Kit (Formularfelder mit `FormField`, Dialoge, Toasts, Anzeige-Bausteine, **DataTable**; vollständige Liste unter „UI components“) + `@efa-one/sdk/frontend/ui/styles.css`
+- `@efa-one/sdk/backend/userDeletions.ts` – `onUserDeleted`: Daten gelöschter Benutzer entfernen (im Scaffold verdrahtet)
 - `@efa-one/sdk/frontend/viewPreferences` – Persistenz-Adapter der `DataTable` (`createViewPreferencesClient`, `useViewPreferences`)
 
 ### Externe Abhängigkeiten — erst prüfen, dann aufnehmen
@@ -279,14 +280,18 @@ und danach alle 10 min, und ruft den Handler mit den Converge-User-UUIDs auf.
 Eine App, die bei der Löschung nicht lief oder aus einer Sicherung kommt, holt
 die Löschung so beim nächsten Start nach.
 
-```ts
-import { onUserDeleted } from '@efa-one/sdk/backend';
+Das Scaffold verdrahtet das bereits (ab Template 1.16): `startServer()` ruft nach
+`initDb()` `onUserDeleted(deleteUserData)` auf, der Handler steht in
+`backend/src/userDeletions.ts` und löscht `app_users` der übergebenen IDs. **Beim Ausbau
+der App dort ergänzen**, als eigene `DELETE`-Anweisungen **vor** `app_users`: persönliche
+Daten ohne FK auf `app_users` (Entwürfe, Verläufe, Ansichten), die noch über `app_users`
+gefunden werden müssen.
 
-// in startServer(), nach initDb()
-onUserDeleted(async (convergeIds) => {
-  // Persönliches zuerst (Tabellen ohne FK auf app_users), dann app_users selbst.
-  await pool.query('DELETE FROM app_users WHERE converge_id = ANY($1)', [convergeIds]);
-});
+```ts
+// backend/src/userDeletions.ts (Auszug). IN ($1, $2, …) statt = ANY($1):
+// läuft so in PostgreSQL und SQLite gleich.
+const placeholders = convergeIds.map((_, i) => `$${i + 1}`).join(', ');
+await pool.query(`DELETE FROM app_users WHERE converge_id IN (${placeholders})`, convergeIds);
 ```
 
 Regeln für den Handler:
@@ -296,12 +301,16 @@ Regeln für den Handler:
   Verläufe) löschen. Firmendaten, die die Person nur angelegt hat (Datensätze,
   veröffentlichte Inhalte), bleiben: `owner_id` wird per `ON DELETE SET NULL` leer.
   Tabellen mit `owner_id … ON DELETE CASCADE` räumt das Löschen von `app_users` mit ab.
-- **Wirft der Handler, kommt dieselbe Seite beim nächsten Lauf erneut.** Daher in
-  einer Transaktion löschen.
+- **Wirft der Handler, kommt dieselbe Seite beim nächsten Lauf erneut.** Eine
+  Transaktion ist deshalb nicht nötig: Bricht er nach der Hälfte ab, löscht der
+  nächste Lauf den Rest, weil jedes `DELETE` idempotent ist. Kein
+  `pool.query('BEGIN')`: bei PostgreSQL landet es auf einer beliebigen Verbindung des
+  Pools, der SQLite-Adapter kennt keine Transaktion. Wichtig ist nur die Reihenfolge
+  (`app_users` zuletzt).
 - **Gesetzliche Aufbewahrung** (unveränderbare Protokolle) nicht löschen, sondern
   in der README begründen.
-- Kernel ohne Endpoint (vor 11/2026) → 404, die Hilfe versucht es leise später erneut.
-  Es gilt also keine Rollout-Reihenfolge wie bei 1.17.
+- Kernel ohne Endpoint (vor v1.4.0) → 404, die Hilfe versucht es leise später erneut.
+  Gelöscht wird dann aber nichts; deshalb trägt das Scaffold `LABEL one.efa.min-kernel="v1.4.0"`.
 - War die App länger als 90 Tage gestoppt, fehlen ältere Löschungen. Dann das
   Lösch-Journal nachziehen (Löschkonzept 8.3/8.4).
 
@@ -1413,9 +1422,7 @@ hält sie als `user.permissions[]` im State. Apps können sie direkt lesen — d
 Hook kümmert sich um die Synchronisation.
 
 ```ts
-// isPlatformAdmin gibt es ab dem SDK-Release nach 1.22.0 (vorgeschlagen 1.23.0);
-// davor wie in App.tsx gegen ['efa-all', 'converge-admin'] prüfen.
-import { isPlatformAdmin } from '@efa-one/sdk/frontend';
+import { isPlatformAdmin } from '@efa-one/sdk/frontend/platformAdmin';
 
 const { user } = useConvergeAuth();
 

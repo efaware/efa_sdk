@@ -8,7 +8,7 @@ Beim Bearbeiten der App liest Claude diese Datei, BEVOR er Code schreibt — bea
 |---|---|
 | Erstellt | {YYYY-MM-DD} |
 | Beantwortet von | {user_email} |
-| Template-Version | 1.15.0 |
+| Template-Version | 1.16.0 |
 
 > **Status-Kürzel:**
 > ⏳ offen — Frage steht aus
