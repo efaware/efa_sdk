@@ -10,6 +10,8 @@ import healthRouter from './routes/health';
 import openapiRouter from './routes/openapi';
 import { registerPermissions } from '@efa-one/sdk/backend/permissions';
 import { registerApiMetadata } from '@efa-one/sdk/backend/apiRegistry';
+import { onUserDeleted } from '@efa-one/sdk/backend/userDeletions';
+import { deleteUserData } from './userDeletions';
 
 // ─── Structured logging ───────────────────────────────────────────────────────
 
@@ -122,6 +124,8 @@ async function startServer(): Promise<void> {
   try {
     await initDb();
     await seedDefaults();
+    // Daten gelöschter Benutzer entfernen (Pflicht, CLAUDE.md → „Gelöschte Benutzer“).
+    onUserDeleted(deleteUserData);
     app.listen(PORT, async () => {
       log('info', `Server started`, { port: PORT, environment: process.env.ENVIRONMENT ?? 'development' });
 

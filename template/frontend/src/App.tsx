@@ -6,11 +6,8 @@ import DevHeader from '@efa-one/sdk/frontend/DevHeader';
 import MainPage from './pages/MainPage';
 import SettingsPage from './pages/SettingsPage';
 import WidgetPage from './pages/WidgetPage';
-import { TooltipProvider } from '@efa-one/sdk/frontend/ui';
-
-// Top platform permission `efa-all` plus the legacy key `converge-admin`
-// (kernel alias, remove in Q1-2027). Mirrors PLATFORM_ADMIN_PERMISSIONS in the SDK.
-const PLATFORM_ADMIN_PERMISSIONS = ['efa-all', 'converge-admin'];
+import { TooltipProvider, ToastProvider } from '@efa-one/sdk/frontend/ui';
+import { isPlatformAdmin } from '@efa-one/sdk/frontend/platformAdmin';
 
 // ─── Inner app (inside HashRouter, so useNavigate works) ─────────────────────
 
@@ -38,12 +35,10 @@ function InnerApp() {
   // Declare to Converge that this app has a settings page.
   // Only sent once auth is ready and the user is a platform admin — non-admins
   // should never see the settings gear icon in the Converge header.
-  // Platform admin = permission `efa-all` (kernel v1.1.0+); during the transition
-  // until Q1-2027 the kernel also sends the legacy key `converge-admin`, and an
-  // older kernel sends only that one — so both count.
-  // TODO: once this scaffold depends on an @efa-one/sdk release that ships it,
-  // replace with `isPlatformAdmin(user?.permissions)` from '@efa-one/sdk/frontend'.
-  const isAdmin = user?.permissions?.some((k) => PLATFORM_ADMIN_PERMISSIONS.includes(k)) ?? false;
+  // Platform admin = permission `efa-all` (kernel v1.1.0+); until Q1-2027 the kernel
+  // also sends the legacy key `converge-admin`. `isPlatformAdmin` accepts both, never
+  // compare against the strings yourself.
+  const isAdmin = isPlatformAdmin(user?.permissions);
   useEffect(() => {
     if (isAdmin) {
       window.parent.postMessage({ type: 'CONVERGE_DECLARE_SETTINGS' }, getParentOrigin());
@@ -123,9 +118,12 @@ function InnerApp() {
 export default function App() {
   return (
     <TooltipProvider>
-      <HashRouter>
-        <InnerApp />
-      </HashRouter>
+      {/* Short confirmations after an action: `const { toast } = useToast(); toast('Gespeichert');` */}
+      <ToastProvider>
+        <HashRouter>
+          <InnerApp />
+        </HashRouter>
+      </ToastProvider>
     </TooltipProvider>
   );
 }
