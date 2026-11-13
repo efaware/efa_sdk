@@ -594,7 +594,7 @@ Das efa-one-Design-System-Kit kommt aus dem SDK: **`@efa-one/sdk/frontend/ui`**
 per SDK-Version-Bump in alle Apps.
 
 ```tsx
-import { Button, Switch, Badge, Dialog, DropdownMenu, Tooltip, EmptyState, Skeleton, RecordDialog, Alert, DataTable } from '@efa-one/sdk/frontend/ui';
+import { Button, FormField, Input, Select, Switch, Badge, Dialog, DropdownMenu, Tooltip, EmptyState, Skeleton, RecordDialog, Alert, DataTable } from '@efa-one/sdk/frontend/ui';
 ```
 
 **Einmal pro App** die Begleit-Styles importieren (liefert die `.badge`/`.alert`/`.skeleton`-
@@ -620,8 +620,24 @@ Bestands-Apps auf Tailwind v3 tragen den Pfad stattdessen in `content` der
 | Component | When to use |
 |---|---|
 | `Button` | All buttons — variants: `primary`, `secondary`, `danger`, `ghost`. Pass `loading` for spinner. |
-| `Switch` | **Jeder boolesche Wert in der UI** (Einstellung an/aus: „Aktiv“, „Widget anzeigen“, „Benachrichtigungen“). `<Switch label="…" description="…" checked={v} onCheckedChange={setV} />`; nur der Schalter ohne Beschriftung: `SwitchControl` mit `aria-label`. Mit `name` liefert er im nativen Formular/`FormData` `"true"`/`"false"`. `tone="danger"`, wenn „an“ eine Einschränkung ist („Konto gesperrt“). **Checkbox nur** für (a) die Auswahl von Zeilen/Einträgen in Listen (macht die `DataTable`) und (b) aktive Bestätigungen („Ich habe gelesen …“, „Ich stimme zu“). |
+| `Switch` | **Jeder boolesche Wert in der UI** (Einstellung an/aus: „Aktiv“, „Widget anzeigen“, „Benachrichtigungen“). `<Switch label="…" description="…" checked={v} onCheckedChange={setV} />`; nur der Schalter ohne Beschriftung: `SwitchControl` mit `aria-label`. Mit `name` liefert er im nativen Formular/`FormData` `"true"`/`"false"`. `tone="danger"`, wenn „an“ eine Einschränkung ist („Konto gesperrt“). **Checkbox nur** für (a) die Auswahl von Zeilen/Einträgen (Tabellen: macht die `DataTable`, sonst `CheckboxGroup`) und (b) aktive Bestätigungen („Ich habe gelesen …“, „Ich stimme zu“) mit `Checkbox`. |
 | `Badge` | Status labels — variants: `success`, `warning`, `danger`, `neutral`. |
+| `FormField` | **Jedes Formularfeld** (ab SDK 1.32): Beschriftung, Pflicht-Stern (`required`), `hint`, `error`. Die Felder darin übernehmen `id`, `aria-describedby`, `aria-invalid`, `required`, `disabled` selbst. Mehrere Steuerelemente unter einer Beschriftung (`RadioGroup`, `CheckboxGroup`): `as="group"`. Zwischenüberschriften: `FormSection`. Keine eigenen `Field`-Bausteine oder `inputCls`-Konstanten. |
+| `Input` / `Textarea` | Freitext ein- bzw. mehrzeilig (`mono` für JSON/Code). Für Datum + Uhrzeit `DateTimeField`. |
+| `Select` | Wenige feste Werte (natives `<select>`, `options` + `placeholder`, `onValueChange`). Nie ein `<select>` mit eigenen Klassen. |
+| `Combobox` | Lange Listen mit Suche (Personen, Partner, Modelle); lokale Suche oder `onSearchChange` für Serversuche. |
+| `SegmentedControl` / `RadioGroup` | 2–5 sichtbare Optionen: Umschalter, der sofort wirkt (Ansicht, Zeitraum) bzw. Auswahl mit Erläuterung je Option. |
+| `Checkbox` / `CheckboxGroup` | Auswahl mehrerer Einträge und aktive Zustimmung. **Nicht** für Ein/Aus-Einstellungen (→ `Switch`). |
+| `SearchInput` | Suchfeld über Listen (Lupe, „×“, Escape leert). |
+| `FileDropzone` | Datei-Upload per Klick oder Ziehen; prüft `accept`, `maxSize`, `maxFiles`, abgelehnte Dateien über `onReject`. |
+| `useToast` | Kurze Rückmeldung nach einer Aktion („Gespeichert“). Braucht einmal `<ToastProvider>` um die App (neben `TooltipProvider`). Fehler, die im Formular behoben werden müssen, bleiben `Alert`. |
+| `Spinner` / `Progress` | Laden ohne bekannte Form bzw. Fortschritt und Kontingente (`tone`). |
+| `Card` | Umrandeter Abschnitt einer Seite (Einstellungsblock, Kennzahlen); `padding="none"` für Tabellen. |
+| `Collapsible` | Auf-/zuklappbarer Abschnitt („Erweitert“). |
+| `Breadcrumb` | Pfad auf Detailseiten („Geschäftspartner › 0000010100“). |
+| `Pagination` | Listen, die der Server seitenweise liefert (die `DataTable` blättert nicht). |
+| `Popover` | Kleines Formular oder Details an einem Auslöser (Filter, Schnelleinstellung). Aktionslisten bleiben `DropdownMenu`. |
+| `Avatar` / `CopyButton` / `Separator` / `Kbd` | Personenbild mit Initialen, Kopieren mit Bestätigung, Trennlinie, Tastenkürzel. |
 | `Alert` | Fehler-/Status-**Banner** in Formularen/Dialogen — variants: `error`, `success`, `warning`, `info`; ab SDK 1.25 immer mit „×" oben rechts (ohne `onDismiss` blendet es sich selbst aus — nur für feste Hinweise; Meldungen aus App-State immer mit `onDismiss`, sonst bleibt derselbe Fehler nach dem Schließen verborgen; `dismissible={false}` schaltet das „×" ab). Nie handgerollt (Kontrast-Falle, siehe Regel unten). |
 | `Dialog` | Confirmations, forms in modal. Always use for destructive actions. Breite über `size` (`sm`…`5xl`, Default `3xl` = 768 px, seit SDK 1.24) — nicht per `className` überschreiben. Kurze Bestätigungen („Wirklich löschen?“) mit `size="sm"`, sonst stehen zwei Zeilen Text in einem 768 px breiten Kasten. **Höhe** ist auf `90vh` gedeckelt: der Body scrollt, Header und Footer stehen fest — Formulare dürfen also beliebig lang werden, der Speichern-Button bleibt erreichbar. Ein Banner, das beim Scrollen sichtbar bleiben muss (Fehler/Validierung), gehört in den `banner`-Slot, **nicht** in `children`. |
 | `RecordDialog` | Lesen/Bearbeiten **kleiner Einträge ohne eigene Adresse** (Einstellungen, Kataloge, Unterpositionen). Geschäftsobjekte bekommen eine Detailseite mit sprechender URL (siehe „Sprechende URLs und Detailseiten"). Breite wie beim `Dialog` über `size` (Default 768 px). |

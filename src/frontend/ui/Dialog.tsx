@@ -1,6 +1,7 @@
 import React from 'react';
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
+import { guardDialogEscape, guardDialogOutside } from './overlay.js';
 
 interface DialogProps {
   open?: boolean;
@@ -130,6 +131,8 @@ export function Dialog({ open, onOpenChange, trigger, title, description, childr
           {...dataAttributes}
           ref={contentRef}
           onOpenAutoFocus={onOpenAutoFocus}
+          onEscapeKeyDown={guardDialogEscape}
+          onInteractOutside={guardDialogOutside}
           className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 ${dialogWidthClass(size)} flex flex-col max-h-[90vh] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95`}
         >
           {/* Header */}

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { nextEnabledKey } from './roving.js';
 
 export interface TabItem<K extends string = string> {
   key: K;
@@ -36,15 +37,7 @@ export function tabIdPrefix(ariaLabel: string): string {
 
 /** Nächster Reiter für Pfeil/Pos1/Ende, gesperrte übersprungen; sonst `null`. */
 export function nextTabKey<K extends string>(items: TabItem<K>[], current: K, key: string): K | null {
-  const enabled = items.filter((t) => !t.disabled);
-  if (enabled.length === 0) return null;
-  if (key === 'Home') return enabled[0].key;
-  if (key === 'End') return enabled[enabled.length - 1].key;
-  if (key !== 'ArrowRight' && key !== 'ArrowLeft') return null;
-  const idx = enabled.findIndex((t) => t.key === current);
-  const step = key === 'ArrowRight' ? 1 : -1;
-  const start = idx === -1 ? (step === 1 ? -1 : 0) : idx;
-  return enabled[(start + step + enabled.length) % enabled.length].key;
+  return nextEnabledKey(items, current, key);
 }
 
 /** Reiterleiste für Detailseiten; Pfeiltasten wechseln, Inhalt über `TabPanel`. */

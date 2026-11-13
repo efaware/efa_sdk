@@ -59,8 +59,19 @@ const perFileThresholds = {
   'src/frontend/ui/ConfirmDeleteDialog.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
   'src/frontend/ui/SidePanel.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
   'src/frontend/ui/dateTimeInput.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
-  'src/frontend/ui/Tabs.tsx': { lines: 72, statements: 72, functions: 69, branches: 90 },
+  // 1.32: Tastenlogik nach roving.ts verschoben (dort 100 %); in Tabs bleibt der DOM-Teil.
+  'src/frontend/ui/Tabs.tsx': { lines: 63, statements: 58, functions: 63, branches: 85 },
+  'src/frontend/ui/roving.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
   'src/frontend/ui/DateTimeField.tsx': { lines: 60, statements: 63, functions: 50, branches: 63 },
+  // 1.32 Ausbau ui-Kit (Formulare, Overlays, Anzeige). Reine Logik (Filter, Position,
+  // Dateiprüfung, Seitenzahlen) voll abgedeckt; Event-Handler ohne DOM ungetestet.
+  'src/frontend/ui/overlay.ts': { lines: 48, statements: 47, functions: 47, branches: 57 },
+  'src/frontend/ui/Combobox.tsx': { lines: 38, statements: 35, functions: 33, branches: 30 },
+  'src/frontend/ui/FileDropzone.tsx': { lines: 74, statements: 71, functions: 54, branches: 68 },
+  'src/frontend/ui/Pagination.tsx': { lines: 83, statements: 88, functions: 57, branches: 85 },
+  'src/frontend/ui/Checkbox.tsx': { lines: 72, statements: 69, functions: 58, branches: 74 },
+  'src/frontend/ui/RadioGroup.tsx': { lines: 90, statements: 90, functions: 66, branches: 91 },
+  'src/frontend/ui/Avatar.tsx': { lines: 92, statements: 87, functions: 50, branches: 100 },
 };
 
 // Die Config wird immer aus dem Paket-Root geladen (npm test läuft dort).

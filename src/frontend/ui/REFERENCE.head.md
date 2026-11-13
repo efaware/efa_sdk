@@ -11,6 +11,8 @@ Business objects (own number, tabs or sub-lists) open on their own **detail page
 
 Detail pages set `data-efa-page="record"` and `data-efa-mode` on their container and `data-efa-action` on their footer buttons themselves.
 
+Forms: wrap every field in `FormField` (label, `hint`, `error`, `required`); the fields inside wire ids and ARIA themselves. Pick the control by the data: free text `Input`/`Textarea`, few fixed values `Select` (2–5 visible: `SegmentedControl` or `RadioGroup`), long lists with search `Combobox`, on/off `Switch`, several of a list or consent `Checkbox`/`CheckboxGroup`, files `FileDropzone`. Never style a native `<select>`, `<textarea>` or checkbox yourself. Short confirmations after an action: `useToast()` (needs `<ToastProvider>` once around the app); errors the user must fix: `Alert` in the form.
+
 Never `window.confirm`/`alert`: use `ConfirmDialog` (or `ConfirmDeleteDialog`). Objects with sub-lists get a detail page with `Tabs`/`TabPanel` and `SidePanel` instead of nested dialogs. Date + time input: `DateTimeField`.
 
 Test markers (set by the components, do not add them yourself): `data-efa-list` (DataTable, value = `listId`), `data-efa-row` (row key), `data-efa-dialog="record" | "confirm-delete" | "confirm"`, `data-efa-tab`, `data-efa-sidepanel`, `data-efa-field="datetime"`, `data-efa-mode`, `data-efa-action="save" | "edit" | "cancel" | "close" | "confirm-delete" | "confirm"`.
