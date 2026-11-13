@@ -26,7 +26,10 @@ const UI_DIR = 'frontend/ui';
 const BARREL = path.join(UI_DIR, 'index.d.ts');
 const HEAD = 'src/frontend/ui/REFERENCE.head.md';
 const OUT = path.join(UI_DIR, 'REFERENCE.md');
-const MAX_BYTES = 32 * 1024;
+// 1.32: von 32 auf 64 KiB angehoben, weil das ui-Kit auf den üblichen Umfang
+// (Formulare, Overlays, Anzeige) gewachsen ist. Agenten lesen per Inhaltsverzeichnis
+// nur ihren Abschnitt; die Abschnittsgrenze bleibt deshalb bei 6 KiB.
+const MAX_BYTES = 64 * 1024;
 const MAX_SECTION_BYTES = 6 * 1024;
 
 /** Reihenfolge der Abschnitte: das Listen-Muster zuerst. Neue Module hängen hinten an. */
@@ -38,13 +41,38 @@ const ORDER = [
   'DataTable',
   'Dialog',
   'Button',
+  'FormField',
   'Input',
+  'Textarea',
+  'Select',
+  'Combobox',
+  'SearchInput',
+  'Checkbox',
+  'RadioGroup',
+  'SegmentedControl',
   'Switch',
+  'DateTimeField',
+  'FileDropzone',
+  'field',
   'Alert',
   'Badge',
   'EmptyState',
   'Skeleton',
+  'Toast',
+  'Spinner',
+  'Progress',
+  'Card',
+  'Tabs',
+  'SidePanel',
+  'ConfirmDialog',
+  'Collapsible',
+  'Breadcrumb',
+  'Pagination',
+  'Avatar',
+  'CopyButton',
+  'Separator',
   'Tooltip',
+  'Popover',
   'DropdownMenu',
   'tableExport',
   'useIsMobile',

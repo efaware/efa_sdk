@@ -1,7 +1,8 @@
 /**
  * @efa-one/sdk/frontend/ui/styles.css
  *
- * Globale Hilfsklassen, die `Badge`, `Skeleton`, `Alert` und `Switch` aus dem SDK-ui-Kit benötigen
+ * Globale Hilfsklassen, die `Badge`, `Skeleton`, `Alert`, `Switch`, `Checkbox`,
+ * `RadioGroup`, `Progress` und `Toast` aus dem SDK-ui-Kit benötigen
  * (sie sind CSS-Klassen-basiert, nicht Tailwind-Arbitrary). Einmal pro App
  * importieren:  import '@efa-one/sdk/frontend/ui/styles.css';
  *
@@ -169,3 +170,94 @@
   .switch:disabled { border-color: GrayText; }
   .switch:disabled .switch-thumb { background: GrayText; }
 }
+
+/* ── Checkbox + Radio ────────────────────────────────────────────
+ * Native Elemente mit `accent-color`: Haken/Punkt, Tastatur, Formular und
+ * Kontrastmodus liefert der Browser. Nur Größe, Farbe und Fokus kommen von hier. */
+.checkbox,
+.radio {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+.checkbox:disabled,
+.radio:disabled { cursor: not-allowed; opacity: 0.5; }
+.checkbox:focus-visible,
+.radio:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.checkbox[aria-invalid='true'],
+[role='radiogroup'][aria-invalid='true'] .radio {
+  outline: 2px solid var(--color-danger);
+  outline-offset: 1px;
+}
+
+/* ── Progress ────────────────────────────────────────────────── */
+.progress {
+  position: relative;
+  height: 6px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--color-surface-raised);
+}
+.progress-bar {
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  transition: width 200ms ease;
+}
+.progress-success .progress-bar { background: var(--color-success); }
+.progress-warning .progress-bar { background: var(--color-warning); }
+.progress-danger .progress-bar  { background: var(--color-danger); }
+.progress-indeterminate {
+  position: absolute;
+  width: 40%;
+  animation: progress-slide 1.2s ease-in-out infinite;
+}
+@keyframes progress-slide {
+  from { left: -40%; }
+  to   { left: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar { transition: none; }
+  .progress-indeterminate { animation: none; left: 0; width: 100%; opacity: 0.5; }
+}
+
+/* ── Toast ───────────────────────────────────────────────────────
+ * Der Bereich liegt per Popover-API im Top-Layer (über Dialogen). Die Vorgaben
+ * des Browsers für `[popover]` (mittig, Rahmen, Hintergrund) hier zurücksetzen.
+ * `pointer-events: auto`: ein offener Radix-Dialog sperrt sonst Klicks außerhalb. */
+.toast-region {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: auto;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-left-width: 4px;
+  border-radius: var(--border-radius-md);
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.15);
+}
+.toast-success { border-left-color: var(--color-success); }
+.toast-error   { border-left-color: var(--color-danger); }
+.toast-warning { border-left-color: var(--color-warning); }
+.toast-info    { border-left-color: var(--color-primary); }

@@ -14,7 +14,7 @@ sub-paths — this keeps `express` out of the frontend and `react` out of the ba
 |---|---|---|
 | `@efa-one/sdk/backend` | Node/Express | Auth + token exchange (`requireAuth`, `createExchangeRouter`, `requireInternalOrAuth` …), health router, service discovery + gateway client (`serviceClient`, `resolveService`), clients for audit/reporting/mail/notifications, permission resolution/registration (`getUserPermissions`, `registerPermissions`, `checkPermission`), platform-admin check (`isPlatformAdmin` — top permission `efa-all`, legacy `converge-admin` accepted until Q1-2027; `requireAdmin`/`requireAdminOrPermission` use it), capability registry (`registerApiMetadata`), backend i18n |
 | `@efa-one/sdk/frontend` | Browser/React | postMessage IPC (`registerAppInfo`, `sendAtStart`, `navigateToApp`, `notifyRouteChange` …), react-i18next factory (`initI18n`), platform-admin check (`isPlatformAdmin`, `PLATFORM_ADMIN_PERMISSIONS`), `DevHeader` |
-| `@efa-one/sdk/frontend/ui` | Browser/React | The efa-one design-system kit: `Button`, `Input`, `Switch` (on/off settings — checkboxes only for row selection and confirmations), `Badge`, `Alert`, `Dialog`, `DropdownMenu`, `Tooltip`, `EmptyState`, `Skeleton`, `RecordDialog` with `useRecords` (ready-made list/create/edit/delete flow) and `ConfirmDeleteDialog`, and the **`DataTable`** (sortable/filterable/groupable list with draggable, resizable columns, a per-user persisted view and CSV/Excel export of the current view; reflows to stacked cards below 640px). Also exports `useIsMobile` — the platform-wide 640px breakpoint hook. Ship its companion CSS once: `import '@efa-one/sdk/frontend/ui/styles.css'` |
+| `@efa-one/sdk/frontend/ui` | Browser/React | The efa-one design-system kit. Forms: `FormField`, `Input`, `Textarea`, `Select`, `Combobox` (searchable), `SearchInput`, `Checkbox`/`CheckboxGroup` (selection and consent), `RadioGroup`, `SegmentedControl`, `Switch` (on/off settings), `DateTimeField`, `FileDropzone`. Feedback and display: `Alert`, `Toast`, `Badge`, `Spinner`, `Progress`, `Skeleton`, `EmptyState`, `Card`, `Avatar`, `CopyButton`, `Collapsible`, `Separator`, `Kbd`. Navigation and overlays: `Tabs`, `Breadcrumb`, `Pagination`, `Dialog`, `SidePanel`, `ConfirmDialog`, `Popover`, `DropdownMenu`, `Tooltip`, `RecordDialog` with `useRecords` (ready-made list/create/edit/delete flow) and `ConfirmDeleteDialog`, and the **`DataTable`** (sortable/filterable/groupable list with draggable, resizable columns, a per-user persisted view and CSV/Excel export of the current view; reflows to stacked cards below 640px). Also exports `useIsMobile` — the platform-wide 640px breakpoint hook. Ship its companion CSS once: `import '@efa-one/sdk/frontend/ui/styles.css'` |
 | `@efa-one/sdk/frontend/format` | Browser | Platform-wide date/time display — `formatDate` (`01.09.2026`), `formatDateTime` (`01.09.2026, 11:05`), `formatTime`, `formatFileStamp`, `localeForLanguage`. Always use these instead of `toLocaleDateString`/`toLocaleString`: without an options object those render `1.9.2026`, and without a locale argument they follow the browser language (`9/1/2026`) |
 | `@efa-one/sdk/frontend/viewPreferences` | Browser/React | Persistence seam for `DataTable` — `createViewPreferencesClient()` (standard `/api/view-preferences/:listId` adapter) + `useViewPreferences()` |
 
@@ -293,6 +293,27 @@ Excel export for such data. No backend or kernel change.
 - `DataTable`: when the grid is wider than its container, a second horizontal
   scrollbar sits above the table and scrolls in sync with the bottom one. Not on
   mobile. The border moved to an outer wrapper.
+
+**1.32.0 — complete form and display kit.** No kernel or backend change, no new dependency.
+- Forms: `FormField` (label, required star, hint, error; the fields inside take over `id`,
+  `aria-describedby`, `aria-invalid`, `required`, `disabled`) and `FormSection`; `Textarea`,
+  `Select` (native, with `options`/`placeholder`/`onValueChange`), `Combobox` (searchable
+  select for long lists, local or server search), `SearchInput`, `Checkbox` + `CheckboxGroup`,
+  `RadioGroup`, `SegmentedControl` and `FileDropzone` (type/size/count check). `fieldClassName()`
+  gives native fields the same look.
+- `Input` forwards its `ref` (also on React 18), takes `invalid` and styles disabled and
+  read-only fields. Visual change: none in the normal state.
+- Feedback and display: `ToastProvider` + `useToast` (short confirmations bottom right,
+  also above dialogs), `Spinner`, `Progress`, `Card`, `Avatar`, `CopyButton` (with fallback
+  when the clipboard API is blocked in the iframe), `Collapsible`, `Breadcrumb`, `Pagination`,
+  `Separator`, `Kbd`.
+- `Popover` and the `Combobox` list use the native Popover API (top layer): they are never
+  clipped by a dialog's scroll area and need no further Radix package.
+- `Dialog` and `SidePanel` keep open when Escape belongs to an open list or a filled search
+  field, and when a toast is clicked.
+- `styles.css` has new classes (`.checkbox`, `.radio`, `.progress*`, `.toast*`); apps already
+  import it.
+- To use toasts, wrap the app once in `<ToastProvider>` (next to `TooltipProvider`).
 
 **1.30.0 — detail pages and confirmations.** No kernel or backend change.
 - New components in `@efa-one/sdk/frontend/ui`: `Tabs` + `TabPanel` (tab strip with

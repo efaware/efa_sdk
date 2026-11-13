@@ -6,6 +6,7 @@ All notable changes to this template will be documented here.
 
 ### Added
 
+- **Formular- und Anzeige-Bausteine (`@efa-one/sdk` 1.32) in `CLAUDE.md`.** Die Komponententabelle nennt `FormField`, `Textarea`, `Select`, `Combobox`, `SearchInput`, `Checkbox`/`CheckboxGroup`, `RadioGroup`, `SegmentedControl`, `FileDropzone`, `useToast`, `Spinner`, `Progress`, `Card`, `Collapsible`, `Breadcrumb`, `Pagination`, `Popover`, `Avatar`, `CopyButton`, `Separator` und `Kbd` mit Einsatzregel. Sobald das Scaffold auf 1.32 zeigt, legt `App.tsx` den `ToastProvider` neben den `TooltipProvider`.
 - **`onUserDeleted` (`@efa-one/sdk` 1.31) in `CLAUDE.md`.** Jede App entfernt die Daten gelöschter Benutzer über die Tombstone-Liste des Kernels. Das Scaffold verdrahtet den Aufruf, sobald es auf 1.31 zeigt.
 
 ### Changed

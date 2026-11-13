@@ -1,6 +1,7 @@
 import React from 'react';
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
+import { guardDialogEscape } from './overlay.js';
 
 export type SidePanelWidth = 'sm' | 'md' | 'lg';
 
@@ -47,6 +48,7 @@ export function SidePanel({ open, onOpenChange, title, description, children, ba
           data-efa-sidepanel=""
           {...dataAttributes}
           onInteractOutside={keepOpenOnOutsideInteraction}
+          onEscapeKeyDown={guardDialogEscape}
           onOpenAutoFocus={focusPanelItself}
           className={sidePanelClass(width)}
         >
