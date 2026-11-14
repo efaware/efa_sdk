@@ -14,7 +14,7 @@ sub-paths — this keeps `express` out of the frontend and `react` out of the ba
 |---|---|---|
 | `@efa-one/sdk/backend` | Node/Express | Auth + token exchange (`requireAuth`, `createExchangeRouter`, `requireInternalOrAuth` …), health router, service discovery + gateway client (`serviceClient`, `resolveService`), clients for audit/reporting/mail/notifications, permission resolution/registration (`getUserPermissions`, `registerPermissions`, `checkPermission`), platform-admin check (`isPlatformAdmin` — top permission `efa-all`, legacy `converge-admin` accepted until Q1-2027; `requireAdmin`/`requireAdminOrPermission` use it), capability registry (`registerApiMetadata`), backend i18n |
 | `@efa-one/sdk/frontend` | Browser/React | postMessage IPC (`registerAppInfo`, `sendAtStart`, `navigateToApp`, `notifyRouteChange` …), react-i18next factory (`initI18n`), platform-admin check (`isPlatformAdmin`, `PLATFORM_ADMIN_PERMISSIONS`), `DevHeader` |
-| `@efa-one/sdk/frontend/ui` | Browser/React | The efa-one design-system kit. Forms: `FormField`, `Input`, `Textarea`, `Select`, `Combobox` (searchable), `SearchInput`, `Checkbox`/`CheckboxGroup` (selection and consent), `RadioGroup`, `SegmentedControl`, `Switch` (on/off settings), `DateTimeField`, `FileDropzone`. Feedback and display: `Alert`, `Toast`, `Badge`, `Spinner`, `Progress`, `Skeleton`, `EmptyState`, `Card`, `Avatar`, `CopyButton`, `Collapsible`, `Separator`, `Kbd`. Navigation and overlays: `Tabs`, `Breadcrumb`, `Pagination`, `Dialog`, `SidePanel`, `ConfirmDialog`, `Popover`, `DropdownMenu`, `Tooltip`, `RecordDialog` with `useRecords` (ready-made list/create/edit/delete flow) and `ConfirmDeleteDialog`, and the **`DataTable`** (sortable/filterable/groupable list with draggable, resizable columns, a per-user persisted view and CSV/Excel export of the current view; reflows to stacked cards below 640px). Also exports `useIsMobile` — the platform-wide 640px breakpoint hook. Ship its companion CSS once: `import '@efa-one/sdk/frontend/ui/styles.css'` |
+| `@efa-one/sdk/frontend/ui` | Browser/React | The efa-one design-system kit. Forms: `FormField`, `Input`, `Textarea`, `Select`, `Combobox` (searchable), `SearchInput`, `SecretInput` (API keys and passwords), `Checkbox`/`CheckboxGroup` (selection and consent), `RadioGroup`, `SegmentedControl`, `Switch` (on/off settings), `DateTimeField`, `FileDropzone`. Feedback and display: `Alert`, `Toast`, `Badge`, `Spinner`, `Progress`, `Skeleton`, `EmptyState`, `Card`, `Avatar`, `CopyButton`, `Collapsible`, `Separator`, `Kbd`. Navigation and overlays: `Tabs`, `Breadcrumb`, `Pagination`, `Dialog`, `SidePanel`, `ConfirmDialog`, `Popover`, `DropdownMenu`, `Tooltip`, `RecordDialog` with `useRecords` (ready-made list/create/edit/delete flow) and `ConfirmDeleteDialog`, and the **`DataTable`** (sortable/filterable/groupable list with draggable, resizable columns, a per-user persisted view and CSV/Excel export of the current view; reflows to stacked cards below 640px). Also exports `useIsMobile` — the platform-wide 640px breakpoint hook. Ship its companion CSS once: `import '@efa-one/sdk/frontend/ui/styles.css'` |
 | `@efa-one/sdk/frontend/format` | Browser | Platform-wide date/time display — `formatDate` (`01.09.2026`), `formatDateTime` (`01.09.2026, 11:05`), `formatTime`, `formatFileStamp`, `localeForLanguage`. Always use these instead of `toLocaleDateString`/`toLocaleString`: without an options object those render `1.9.2026`, and without a locale argument they follow the browser language (`9/1/2026`) |
 | `@efa-one/sdk/frontend/viewPreferences` | Browser/React | Persistence seam for `DataTable` — `createViewPreferencesClient()` (standard `/api/view-preferences/:listId` adapter) + `useViewPreferences()` |
 
@@ -293,6 +293,17 @@ Excel export for such data. No backend or kernel change.
 - `DataTable`: when the grid is wider than its container, a second horizontal
   scrollbar sits above the table and scrolls in sync with the bottom one. Not on
   mobile. The border moved to an outer wrapper.
+
+**1.33.0 — secret field.** No kernel or backend change, no new dependency.
+- `SecretInput` for API keys, passwords and other secrets. With `isSet` (a secret is
+  stored) the empty field shows a fixed row of dots (`SECRET_MASK`, 12 characters), so
+  the user sees that something is stored without learning its length. Focus selects
+  the dots, typing or pasting replaces them; leaving the field empty brings them back.
+  `value` stays `''` until the user types, so the app sends the field only when it is
+  not empty, as before. Without a stored secret the field is empty.
+- Drop hints like „leer = unverändert“ / „leer lassen, um zu behalten“ next to such
+  fields: the dots say it. Apps switch over when they are touched anyway.
+- Markers: `data-efa-field="secret"`, `data-efa-secret="set" | "empty"`.
 
 **1.32.0 — complete form and display kit.** No kernel or backend change, no new dependency.
 - Forms: `FormField` (label, required star, hint, error; the fields inside take over `id`,

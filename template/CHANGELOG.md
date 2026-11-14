@@ -4,6 +4,10 @@ All notable changes to this template will be documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Geheimnisfelder mit `SecretInput` (`@efa-one/sdk` 1.33).** `CLAUDE.md` → „API-Keys / Passwörter“: Ist ein Key oder Passwort gespeichert, zeigt das Feld eine feste Reihe Punkte; ohne gespeichertes Geheimnis bleibt es leer. Der Hinweis „leer lassen, um zu behalten“ entfällt.
+
 ## [1.16.0] - 2026-11-13
 
 ### Added
