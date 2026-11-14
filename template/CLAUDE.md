@@ -638,6 +638,7 @@ Bestands-Apps auf Tailwind v3 tragen den Pfad stattdessen in `content` der
 | `SegmentedControl` / `RadioGroup` | 2–5 sichtbare Optionen: Umschalter, der sofort wirkt (Ansicht, Zeitraum) bzw. Auswahl mit Erläuterung je Option. |
 | `Checkbox` / `CheckboxGroup` | Auswahl mehrerer Einträge und aktive Zustimmung. **Nicht** für Ein/Aus-Einstellungen (→ `Switch`). |
 | `SearchInput` | Suchfeld über Listen (Lupe, „×“, Escape leert). |
+| `SecretInput` | API-Keys und Passwörter: gespeichert = feste Punktreihe, sonst leer; kein Hinweis „leer = unverändert“ (ab 1.33). |
 | `FileDropzone` | Datei-Upload per Klick oder Ziehen; prüft `accept`, `maxSize`, `maxFiles`, abgelehnte Dateien über `onReject`. |
 | `useToast` | Kurze Rückmeldung nach einer Aktion („Gespeichert“). Braucht einmal `<ToastProvider>` um die App (neben `TooltipProvider`). Fehler, die im Formular behoben werden müssen, bleiben `Alert`. |
 | `Spinner` / `Progress` | Laden ohne bekannte Form bzw. Fortschritt und Kontingente (`tone`). |
@@ -996,10 +997,24 @@ bekommt `'create'` oder `'edit'` und muss in **beiden** Fällen speichern.
   deaktivieren kann.
 
 **API-Keys / Passwörter:**
-- Read: als „gesetzt: Ja/Nein" oder Maskierung — niemals den Klartext-Wert
-  zurückgeben (Backend gibt ihn nicht zurück).
-- Edit: leeres Feld bedeutet „behalten", neuer Wert überschreibt.
-- Im Edit-Layout den Hinweis „leer lassen, um zu behalten" mit anzeigen.
+- Backend: nie den Klartext zurückgeben, nur „gesetzt: Ja/Nein" (`has_secret`,
+  `apiKeySet` …). Beim Speichern gilt: Feld fehlt oder ist leer = behalten, neuer
+  Wert überschreibt.
+- Edit: immer `SecretInput` aus `@efa-one/sdk/frontend/ui` (ab SDK 1.33) mit
+  `isSet={has_secret}`, `value` startet als `''`. Ist ein Geheimnis gespeichert,
+  steht eine feste Reihe Punkte im Feld; ohne gespeichertes Geheimnis bleibt es leer.
+  Mitschicken nur, wenn `value` nicht leer ist.
+- **Kein** Hinweis „leer lassen = unverändert" / „leer lassen, um zu behalten" am
+  Feld und kein leeres Feld mit `placeholder="••••"`: die Punkte zeigen, dass etwas
+  gespeichert ist. Ein Geheimnis entfernen, wo das fachlich geht, über einen eigenen
+  Button „Entfernen", nicht über ein geleertes Feld.
+
+```tsx
+<FormField label="API-Key">
+  <SecretInput isSet={settings.apiKeySet} value={apiKey} onValueChange={setApiKey} />
+</FormField>
+// Speichern: { ...rest, ...(apiKey ? { apiKey } : {}) }
+```
 
 **Validierungs-/Speicherfehler:** das `error`-Prop von `RecordDialog` nutzen —
 das Banner wird lesbar und **oben, außerhalb des Scrolls** gerendert (sichtbar,

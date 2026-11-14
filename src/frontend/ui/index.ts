@@ -22,6 +22,7 @@ export { Checkbox, CheckboxGroup, type CheckboxProps, type CheckboxGroupProps, t
 export { RadioGroup, type RadioGroupProps } from './RadioGroup.js';
 export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from './SegmentedControl.js';
 export { SearchInput, type SearchInputProps } from './SearchInput.js';
+export { SecretInput, SECRET_MASK, type SecretInputProps } from './SecretInput.js';
 export { Combobox, filterOptions, type ComboboxProps, type ComboboxOption } from './Combobox.js';
 export {
   FileDropzone,
