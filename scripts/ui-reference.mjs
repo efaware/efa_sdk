@@ -47,6 +47,7 @@ const ORDER = [
   'Select',
   'Combobox',
   'SearchInput',
+  'SecretInput',
   'Checkbox',
   'RadioGroup',
   'SegmentedControl',
