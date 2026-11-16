@@ -2,6 +2,12 @@
 
 All notable changes to this template will be documented here.
 
+## [1.17.1] - 2026-11-16
+
+### Changed
+
+- **`SecretInput` mit Auge (`@efa-one/sdk` 1.34).** `CLAUDE.md` → „API-Keys / Passwörter“ und die Komponententabelle: Das Feld deckt mit einem Auge nur die neue Eingabe auf, nie den gespeicherten Wert. Apps bauen kein eigenes Passwortfeld mit Auge mehr.
+
 ## [1.17.0] - 2026-11-16
 
 ### Added
