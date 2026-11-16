@@ -261,3 +261,10 @@
 .toast-error   { border-left-color: var(--color-danger); }
 .toast-warning { border-left-color: var(--color-warning); }
 .toast-info    { border-left-color: var(--color-primary); }
+
+/* ── SecretInput ─────────────────────────────────────────────────
+ * Edge bringt in Passwortfeldern ein eigenes Auge mit; das SecretInput hat
+ * sein eigenes (nur für die neue Eingabe). Sonst stünden zwei Augen im Feld. */
+input[data-efa-field='secret']::-ms-reveal {
+  display: none;
+}

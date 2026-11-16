@@ -303,6 +303,7 @@ Excel export for such data. No backend or kernel change.
   value never comes back from the backend anyway. Emptying the field hides it again.
   `revealable={false}` turns the eye off.
 - `className` now applies to the wrapper around the field (width), like `SearchInput`.
+- `styles.css` hides Edge's own reveal button on the field, so there is only one eye.
 - Apps drop their own password fields with an eye and use `SecretInput` for every
   password, API key and client secret.
 
