@@ -2,10 +2,15 @@
 
 All notable changes to this template will be documented here.
 
-## [Unreleased]
+## [1.17.0] - 2026-11-16
+
+### Added
+
+- **Intake-Block „KI-Zugang“: KI über einen API-Key aus dem efa one Portal.** Neue Apps rufen KI über einen API-Key auf, den der Kunde im Portal unter „API-Keys“ anlegt (Abo, Typ der KI, Modelle, Monatslimit). `CLAUDE.md` → „KI-Zugang über einen API-Key“ legt die Regeln fest: Einstellung `EFA_AI_KEY` auf der Einstellungsseite (verschlüsselt, `SecretInput`, nie in der `.env`), Basis-URL fest `https://ai.efaone.de/v1` (lokal über `EFA_AI_BASE_URL` überschreibbar), Modellauswahl aus `GET /v1/models` ohne Abfragen auf Modell-IDs, OpenAI-kompatible Aufrufe plus `/v1/ocr` und `/v1/web-search`, verständliche Fehlertexte für 401/402/403. `docs/intake.md`, `docs/BUSINESS_PROMPT_TEMPLATE.md` und `README.md` ziehen mit.
 
 ### Changed
 
+- **Bedingte Fragen OCR (§ 10) und Voice2Text (§ 12)** laufen über den KI-Zugang (`/v1/ocr`, `/v1/audio/transcriptions`) statt über `serviceClient.call('converge_ai', …)`. Wissens-Silos (§ 11) bleiben bei efa-ai der Instanz. Die Intake-DoD prüft `EFA_AI_KEY` statt `CONVERGE_AI_*`-Env-Vars.
 - **Geheimnisfelder mit `SecretInput` (`@efa-one/sdk` 1.33).** `CLAUDE.md` → „API-Keys / Passwörter“: Ist ein Key oder Passwort gespeichert, zeigt das Feld eine feste Reihe Punkte; ohne gespeichertes Geheimnis bleibt es leer. Der Hinweis „leer lassen, um zu behalten“ entfällt.
 
 ## [1.16.0] - 2026-11-13
