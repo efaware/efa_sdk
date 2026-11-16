@@ -14,6 +14,11 @@ function getAppVersion(mode: string): string {
 export default defineConfig(({ mode }) => ({
   base: './',
   plugins: [react()],
+  build: {
+    // Lizenztexte + Copyright der gebündelten Pakete (MIT/BSD/Apache/EPL verlangen
+    // sie bei der Weitergabe); landet in dist/ und damit im Frontend-Image.
+    license: { fileName: 'THIRD-PARTY-NOTICES.md' },
+  },
   define: {
     __APP_VERSION__: JSON.stringify(getAppVersion(mode)),
   },
