@@ -33,6 +33,10 @@ Tipp: Landet das Ergebnis in einem anderen System, hat etwas einen Zustand (offe
 - Welche Felder brauche ich pro Service?
 - Nur lesen oder auch schreiben?
 
+## KI
+- Soll die App KI nutzen (Texte erzeugen oder auswerten, zusammenfassen, übersetzen, Texterkennung, Spracherkennung, Websuche)? Wofür genau?
+- Dafür brauchst du einen API-Key aus dem efa one Portal (unter KI → „API-Keys“). Eingetragen wird er später in der App hinter dem Zahnrad, nicht im Chat.
+
 ## Fachregeln
 - Welche Bedingungen/Entscheidungen gelten?
 - Welche Pflichtfelder/Validierungen gibt es?
@@ -65,5 +69,6 @@ Wichtig:
 - Read/write scope per service
 - Dependency error behavior
 - Acceptance criteria
+- Whether the app uses AI, and for what (AI runs over an API key from the efa one portal)
 - Which actions appear in efa-one reporting-db (analytics)
 - Which actions appear in audit log (compliance)

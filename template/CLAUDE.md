@@ -1,6 +1,6 @@
 # efa-one App Template
 
-efa-app-template-version: 1.16.0
+efa-app-template-version: 1.17.0
 
 ## What this is
 
@@ -397,8 +397,8 @@ werden?").
 
 - `Template-Version` in `docs/intake.md` < aktuelle Template-Version → nur die
   neu hinzugekommenen Fragen stellen.
-- Wenn der User „durchlauf den Intake nochmal" sagt → alle 14 Punkte (0–13) mit den
-  vorhandenen Antworten zur Aktualisierung anbieten.
+- Wenn der User „durchlauf den Intake nochmal" sagt → alle 14 Punkte (0–13) und den
+  Block „KI-Zugang" mit den vorhandenen Antworten zur Aktualisierung anbieten.
 - Bestands-Apps ohne Frage 0 in `docs/intake.md`: Frage 0 **vor** der nächsten
   Funktionsänderung stellen, auch wenn die App schon läuft.
 
@@ -476,8 +476,8 @@ das mit. Antworten in `docs/intake.md §0` eintragen.
 ### Pflichtfragen (9) — nach Frage 0
 
 Reihenfolge ist verbindlich. Wenn `/new-app` schon einen Pre-Intake gemacht hat
-(Fragen 0, 1, 2, 7, 8, 9 — alles, was direkt aufs Scaffolding wirkt), starte beim
-ersten unbeantworteten Punkt.
+(Fragen 0, 1, 2, 7, 8, 9 und KI-Zugang — alles, was direkt aufs Scaffolding wirkt),
+starte beim ersten unbeantworteten Punkt.
 
 | # | Frage (in Du-Form, Deutsch) | Vorgeschlagene Optionen | Was du daraus ableitest |
 |---|---|---|---|
@@ -491,6 +491,53 @@ ersten unbeantworteten Punkt.
 | 8 | Greift deine App auf Daten anderer efa-apps zu (Kalender, Mail, Chat, ZBV, …)? | (a) Nein  (b) Mehrfach-Auswahl aus installierten Apps  (c) Eigene Liste | Service-Keys in `docs/intake.md §8`; `resolveService(...)` + `serviceClient.call(...)` in `backend/src/services/`-Stubs; **niemals** hardcoded Hosts |
 | 9 | In welchen Sprachen soll die App verfügbar sein? | (a) Nur Deutsch (Empfehlung für interne Apps)  (b) Deutsch + Englisch  (c) Mehr | `frontend/src/locales/{de,…}/common.json` + `initI18n(['de','en'])`; im Backend `loadLocales()` falls Texte zurückgegeben werden |
 
+### KI-Zugang über einen API-Key (nach den Pflichtfragen)
+
+Stell die Frage, wenn die Beschreibung auf KI hindeutet („KI", „automatisch erkennen",
+„zusammenfassen", „übersetzen", „auswerten", „Text erzeugen", „Bild", „Texterkennung",
+„Spracherkennung", „Websuche", „Chat") oder wenn eine der bedingten Fragen 10 oder 12
+mit Ja beantwortet wird. Trifft nichts davon zu, setzt du den Block auf `↪ übersprungen`.
+
+| Frage | Optionen | Was du daraus ableitest |
+|---|---|---|
+| Nutzt deine App KI (Texte erzeugen oder auswerten, zusammenfassen, übersetzen, Bilder, Texterkennung, Spracherkennung, Websuche)? | (a) Nein  (b) Ja, über einen API-Key aus dem efa one Portal | bei (b): Einstellung `EFA_AI_KEY`, KI-Client gegen `https://ai.efaone.de/v1`, Modellauswahl aus `GET /v1/models` (Regeln unten) |
+
+Bei (b) sagst du dem User, dass die App einen **API-Key aus dem efa one Portal** braucht:
+„Im Portal unter **KI** → **API-Keys** → **API-Key erstellen**: Bezeichnung, Abo, Typ
+der KI, Modelle und Monatslimit wählen, den Key einmal kopieren. Eingetragen wird er in der
+App hinter dem Zahnrad bei ‚API-Key aus dem efa one Portal', nie im Chat." Der Typ am Key
+muss zur Funktion passen (Text, Embedding, Texterkennung, Spracherkennung, Bild, Websuche).
+Die Antwortoptionen sind nur (a) und (b). Biete keinen anderen KI-Weg an.
+
+**Regeln für den KI-Zugang:**
+
+- **Einstellung `EFA_AI_KEY`** (geheim, Pflicht, Bezeichnung „API-Key aus dem efa one
+  Portal") auf der Einstellungsseite hinter dem Zahnrad, verschlüsselt in der App-DB
+  (Node `crypto`, keine neue Dependency). Eingabe mit `SecretInput` (siehe „API-Keys /
+  Passwörter"). Nie in die `.env`, nie im Chat erfragen, nie an das Frontend zurückgeben.
+- **Basis-URL** fest `https://ai.efaone.de/v1` im Code (das efa Gateway). Nur für lokale
+  Tests über die technische Env `EFA_AI_BASE_URL` überschreibbar. Header
+  `Authorization: Bearer <key>`.
+- **Modelle:** Die Einstellungsseite bietet die Auswahl aus `GET /v1/models` an (mit dem
+  Key aufgerufen; liefert nur, was der Key darf, mit `modality` und `capabilities`).
+  Gespeichert wird der `id`-Wert. **Kein Code fragt Modell-IDs ab**, auch nicht per Regex:
+  Was ein Modell kann, steht in `capabilities`. Fehlt ein Feld, gilt die vorsichtige Vorgabe.
+- **Aufrufe** OpenAI-kompatibel: `/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`,
+  `/v1/audio/transcriptions`, `/v1/images/generations`, dazu `/v1/ocr` und
+  `/v1/web-search`. Antworten von Denkmodellen können `content` als Liste von Teilen
+  liefern; dann nur die `text`-Teile lesen.
+- **Fehler** verständlich anzeigen und aufs Portal verweisen: 401 → „API-Key ungültig oder
+  gesperrt", 402 `key_limit_reached` → „Monatslimit des API-Keys erreicht", 402
+  `overage_cap_reached` → „Obergrenze der Zusatznutzung erreicht", 402
+  `license_expired` → „Abo nicht aktiv", 403 → „Modell oder Typ für diesen API-Key nicht
+  freigegeben". Fehlt der Key, zeigt die App einen Hinweis mit Verweis auf die
+  Einstellungen statt eines Fehlers.
+- **Netz:** Der App-Container braucht Ausgang zu `ai.efaone.de:443`.
+- **Verbrauch** zählt als Zusatznutzung der Organisation und erscheint im Portal je Key,
+  nicht im KI-Kontingent der Person. Die App schickt keine Benutzerkennung an das Gateway.
+- **Ausnahme Wissens-Silos (Frage 11):** RAG läuft über efa-ai der Instanz
+  (`converge_ai`), dafür gibt es keinen API-Key-Weg.
+
 ### Bedingte Fragen (4) — nur bei Heuristik-Treffer stellen
 
 Stell die Frage automatisch, wenn die App-Beschreibung eines der Trigger-Wörter
@@ -499,9 +546,9 @@ Funktion noch einmal nachfragen.
 
 | # | Frage | Trigger-Wörter in der Beschreibung | Ableitung |
 |---|---|---|---|
-| 10 | Sollen Belege oder Dokumente per OCR ausgelesen werden? | „Beleg", „Rechnung", „Scan", „PDF", „Dokument" | `serviceClient.call('converge_ai', ...)` auf den OCR-Endpoint; Upload-Route-Stub |
+| 10 | Sollen Belege oder Dokumente per OCR ausgelesen werden? | „Beleg", „Rechnung", „Scan", „PDF", „Dokument" | setzt KI-Zugang (b) voraus, Typ „Texterkennung" am Key; `POST /v1/ocr` am efa Gateway mit `EFA_AI_KEY`, Modell aus `GET /v1/models`; Upload-Route-Stub |
 | 11 | Soll die App eigenes Wissen für KI-Antworten bereitstellen (RAG / Wissens-Silo)? | „Anleitung", „FAQ", „Wissen", „Suche" | `converge_ai` Silo-Anlage beim Start; Embedding-/Such-Aufrufe |
-| 12 | Soll der Nutzer per Sprache eingeben können (Voice2Text)? | „Sprache", „Aufnahme", „mobil", „unterwegs" | `converge_ai` Voice2Text-Endpoint; Mikrofon-Button im Frontend |
+| 12 | Soll der Nutzer per Sprache eingeben können (Voice2Text)? | „Sprache", „Aufnahme", „mobil", „unterwegs" | setzt KI-Zugang (b) voraus, Typ „Spracherkennung" am Key; `POST /v1/audio/transcriptions` am efa Gateway mit `EFA_AI_KEY` (Audio als `multipart/form-data`), Modell aus `GET /v1/models`; Mikrofon-Button im Frontend |
 | 13 | Soll die App planmäßig im Hintergrund laufen (z.B. nächtlicher Reminder, wöchentlicher Report)? *(geplant, BACKLOG)* | „täglich", „wöchentlich", „Erinnerung", „Report" | TODO ins README + intake.md mit Hinweis „kommt später ins SDK (`@efa-one/sdk` `jobs`, BACKLOG)" |
 
 ### Was NICHT abgefragt wird (immer automatisch im Template)
@@ -532,7 +579,7 @@ Eine App ist „fachlich vollständig" wenn:
 - bei Frage 0 = (c): Vorgangs-Tabelle + Verlaufsübersicht existieren
 - alle 9 Pflichtfragen in `docs/intake.md` Status ≥ `✅ beantwortet` haben (oder bei
   Frage 0 = (a) begründet `↪ entfällt`)
-- bedingte Fragen 10–13 entweder beantwortet oder als „↪ übersprungen" markiert sind
+- Block „KI-Zugang" und bedingte Fragen 10–13 entweder beantwortet oder als „↪ übersprungen" markiert sind
 - `registerPermissions(...)` in `backend/src/index.ts` Frage 1 reflektiert
 - `x-converge.default_permissions` in `routes/openapi.ts` synchron zu Frage 1 ist
 - bei Frage 2 ≠ (a): `restrictToOwner`-Helper bzw. äquivalenter `owner_id`-Filter
@@ -543,7 +590,10 @@ Eine App ist „fachlich vollständig" wenn:
 - bei Frage 7 ≠ (a): `registerApiMetadata` mit ≥ 1 Capability + Schema in OpenAPI
 - bei Frage 8 ≠ (a): `serviceDiscovery`-Lookups vorhanden
 - Frage 9: `locales/{de,…}/common.json` angelegt
-- bei bedingten 10–12 = ja: `CONVERGE_AI_*`-Env-Vars in `.env.example` ergänzt + Stub-Routen
+- bei KI-Zugang = (b): Einstellung `EFA_AI_KEY` auf der Einstellungsseite (verschlüsselt, `SecretInput`),
+  Modellauswahl aus `GET /v1/models`, Fehlertexte für 401/402/403; kein Key in `.env.example`
+- bei bedingten 10 und 12 = ja: Aufrufe über den KI-Zugang (`/v1/ocr`, `/v1/audio/transcriptions`) + Stub-Routen
+- bei bedingter 11 = ja: Silo-Anlage über `converge_ai` + Stub-Routen
 
 > **User-Eingabevorlage:** Wenn der User selbst die fachliche Beschreibung
 > strukturiert liefern will, verweise ihn auf `docs/BUSINESS_PROMPT_TEMPLATE.md`.

@@ -53,7 +53,7 @@ Danach:
    `SERVICE_KEY` (Underscore-Form, z. B. `efa_myapp`), `APP_NAME`, `APP_SESSION_COOKIE_NAME` und
    `IMAGE_REPOSITORY` setzen; in `docker-compose.yml` (und `frontend/nginx.conf`) den Backend-Alias
    `template-backend` durch einen eindeutigen Namen ersetzen, z. B. `efa-myapp-backend`.
-2. **Fachlicher Intake** (`docs/intake.md`) — die 9 Pflichtfragen + bedarfsweise 4 bedingte
+2. **Fachlicher Intake** (`docs/intake.md`) — die 9 Pflichtfragen + bedarfsweise den KI-Zugang und 4 bedingte
    beantworten. Der vollständige Katalog steht in `CLAUDE.md` → „Fachliche Intake-Fragen";
    `docs/BUSINESS_PROMPT_TEMPLATE.md` ist die Copy/Paste-Eingabevorlage für Fachanwender.
 3. Routen unter `backend/src/routes/` schreiben, UI-Seiten unter `frontend/src/pages/`.

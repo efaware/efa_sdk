@@ -8,7 +8,7 @@ Beim Bearbeiten der App liest Claude diese Datei, BEVOR er Code schreibt — bea
 |---|---|
 | Erstellt | {YYYY-MM-DD} |
 | Beantwortet von | {user_email} |
-| Template-Version | 1.16.0 |
+| Template-Version | 1.17.0 |
 
 > **Status-Kürzel:**
 > ⏳ offen — Frage steht aus
@@ -130,6 +130,24 @@ Beim Bearbeiten der App liest Claude diese Datei, BEVOR er Code schreibt — bea
 
 ---
 
+## KI-Zugang
+
+### KI. Nutzt die App KI?
+**Frage:** Nutzt deine App KI (Texte erzeugen oder auswerten, zusammenfassen, übersetzen, Bilder, Texterkennung, Spracherkennung, Websuche)? (a) Nein (b) Ja, über einen API-Key aus dem efa one Portal
+
+> Die App ruft KI über einen API-Key aus dem efa one Portal auf. Der Kunde legt ihn im Portal unter KI → „API-Keys“ an (Abo, Typ der KI, Modelle, Monatslimit) und trägt ihn in der App hinter dem Zahnrad ein, nie im Chat. Regeln: `CLAUDE.md` → „KI-Zugang über einen API-Key“.
+
+- Status: ⏳ offen
+- Antwort:
+- Ableitung (bei b):
+  - Einstellung `EFA_AI_KEY` (geheim, Pflicht, Bezeichnung „API-Key aus dem efa one Portal“) auf der Einstellungsseite, verschlüsselt in der App-DB, Feld `SecretInput`. Nie in die `.env`
+  - Basis-URL fest `https://ai.efaone.de/v1` im Code, für lokale Tests über die Env `EFA_AI_BASE_URL` überschreibbar; `Authorization: Bearer <key>`
+  - Modellauswahl auf der Einstellungsseite aus `GET /v1/models`, gespeichert wird der `id`-Wert
+  - Aufrufe OpenAI-kompatibel (`/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`, `/v1/images/generations`), dazu `/v1/ocr`, `/v1/audio/transcriptions`, `/v1/web-search`
+  - Fehler 401/402 (`key_limit_reached`, `overage_cap_reached`, `license_expired`)/403 verständlich anzeigen und aufs Portal verweisen
+
+---
+
 ## Bedingte Fragen (nur bei Bedarf)
 
 Diese Fragen werden nur gestellt, wenn die App-Beschreibung darauf hindeutet (Heuristik in CLAUDE.md). Sonst bleiben sie auf „↪ übersprungen".
@@ -140,7 +158,8 @@ Diese Fragen werden nur gestellt, wenn die App-Beschreibung darauf hindeutet (He
 - Status: ↪ übersprungen
 - Antwort:
 - Ableitung (falls aktiviert):
-  - `serviceClient.call('converge_ai', 'POST /api/internal/ocr/extract', ...)`
+  - setzt den KI-Zugang voraus (Block „KI-Zugang“ = b, Typ „Texterkennung (OCR)“ am Key)
+  - `POST https://ai.efaone.de/v1/ocr` mit dem `EFA_AI_KEY`, OCR-Modell aus `GET /v1/models`
   - Upload-Route in `backend/src/routes/uploads.ts`
 
 ### 11. Wissens-Silos / RAG
@@ -149,6 +168,7 @@ Diese Fragen werden nur gestellt, wenn die App-Beschreibung darauf hindeutet (He
 - Status: ↪ übersprungen
 - Antwort:
 - Ableitung (falls aktiviert):
+  - Wissens-Silos liegen in efa-ai der Instanz (`converge_ai`), dafür gibt es keinen API-Key-Weg
   - `converge_ai` Silo-Anlage beim Start
   - `/api/knowledge/silos`-Endpoints
 
@@ -158,7 +178,8 @@ Diese Fragen werden nur gestellt, wenn die App-Beschreibung darauf hindeutet (He
 - Status: ↪ übersprungen
 - Antwort:
 - Ableitung (falls aktiviert):
-  - `converge_ai` Voice2Text-Endpoint
+  - setzt den KI-Zugang voraus (Block „KI-Zugang“ = b, Typ „Spracherkennung“ am Key)
+  - `POST https://ai.efaone.de/v1/audio/transcriptions` mit dem `EFA_AI_KEY` (OpenAI-kompatibel, Audio als `multipart/form-data`), Modell aus `GET /v1/models`
   - Mikrofon-Button-Hook im Frontend
 
 ### 13. Hintergrund-Aufgaben (Cron) — geplant
