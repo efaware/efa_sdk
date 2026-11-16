@@ -35,7 +35,7 @@ Tipp: Landet das Ergebnis in einem anderen System, hat etwas einen Zustand (offe
 
 ## KI
 - Soll die App KI nutzen (Texte erzeugen oder auswerten, zusammenfassen, übersetzen, Texterkennung, Spracherkennung, Websuche)? Wofür genau?
-- Dafür brauchst du einen API-Key aus dem efa one Portal (Seitenleiste „API-Keys“). Eingetragen wird er später in der App hinter dem Zahnrad, nicht im Chat.
+- Dafür brauchst du einen API-Key aus dem efa one Portal (unter KI → „API-Keys“). Eingetragen wird er später in der App hinter dem Zahnrad, nicht im Chat.
 
 ## Fachregeln
 - Welche Bedingungen/Entscheidungen gelten?

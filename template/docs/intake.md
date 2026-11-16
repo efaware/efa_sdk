@@ -135,7 +135,7 @@ Beim Bearbeiten der App liest Claude diese Datei, BEVOR er Code schreibt — bea
 ### KI. Nutzt die App KI?
 **Frage:** Nutzt deine App KI (Texte erzeugen oder auswerten, zusammenfassen, übersetzen, Bilder, Texterkennung, Spracherkennung, Websuche)? (a) Nein (b) Ja, über einen API-Key aus dem efa one Portal
 
-> Die App ruft KI über einen API-Key aus dem efa one Portal auf. Der Kunde legt ihn im Portal unter „API-Keys“ an (Abo, Typ der KI, Modelle, Monatslimit) und trägt ihn in der App hinter dem Zahnrad ein, nie im Chat. Regeln: `CLAUDE.md` → „KI-Zugang über einen API-Key“.
+> Die App ruft KI über einen API-Key aus dem efa one Portal auf. Der Kunde legt ihn im Portal unter KI → „API-Keys“ an (Abo, Typ der KI, Modelle, Monatslimit) und trägt ihn in der App hinter dem Zahnrad ein, nie im Chat. Regeln: `CLAUDE.md` → „KI-Zugang über einen API-Key“.
 
 - Status: ⏳ offen
 - Antwort:
@@ -144,7 +144,7 @@ Beim Bearbeiten der App liest Claude diese Datei, BEVOR er Code schreibt — bea
   - Basis-URL fest `https://ai.efaone.de/v1` im Code, für lokale Tests über die Env `EFA_AI_BASE_URL` überschreibbar; `Authorization: Bearer <key>`
   - Modellauswahl auf der Einstellungsseite aus `GET /v1/models`, gespeichert wird der `id`-Wert
   - Aufrufe OpenAI-kompatibel (`/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`, `/v1/images/generations`), dazu `/v1/ocr`, `/v1/audio/transcriptions`, `/v1/web-search`
-  - Fehler 401/402/403 verständlich anzeigen und aufs Portal verweisen
+  - Fehler 401/402 (`key_limit_reached`, `overage_cap_reached`, `license_expired`)/403 verständlich anzeigen und aufs Portal verweisen
 
 ---
 

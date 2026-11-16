@@ -503,7 +503,7 @@ mit Ja beantwortet wird. Trifft nichts davon zu, setzt du den Block auf `↪ üb
 | Nutzt deine App KI (Texte erzeugen oder auswerten, zusammenfassen, übersetzen, Bilder, Texterkennung, Spracherkennung, Websuche)? | (a) Nein  (b) Ja, über einen API-Key aus dem efa one Portal | bei (b): Einstellung `EFA_AI_KEY`, KI-Client gegen `https://ai.efaone.de/v1`, Modellauswahl aus `GET /v1/models` (Regeln unten) |
 
 Bei (b) sagst du dem User, dass die App einen **API-Key aus dem efa one Portal** braucht:
-„Im Portal in der Seitenleiste **API-Keys** → **API-Key erstellen**: Bezeichnung, Abo, Typ
+„Im Portal unter **KI** → **API-Keys** → **API-Key erstellen**: Bezeichnung, Abo, Typ
 der KI, Modelle und Monatslimit wählen, den Key einmal kopieren. Eingetragen wird er in der
 App hinter dem Zahnrad bei ‚API-Key aus dem efa one Portal', nie im Chat." Der Typ am Key
 muss zur Funktion passen (Text, Embedding, Texterkennung, Spracherkennung, Bild, Websuche).
@@ -528,12 +528,13 @@ Die Antwortoptionen sind nur (a) und (b). Biete keinen anderen KI-Weg an.
   liefern; dann nur die `text`-Teile lesen.
 - **Fehler** verständlich anzeigen und aufs Portal verweisen: 401 → „API-Key ungültig oder
   gesperrt", 402 `key_limit_reached` → „Monatslimit des API-Keys erreicht", 402
+  `overage_cap_reached` → „Obergrenze der Zusatznutzung erreicht", 402
   `license_expired` → „Abo nicht aktiv", 403 → „Modell oder Typ für diesen API-Key nicht
   freigegeben". Fehlt der Key, zeigt die App einen Hinweis mit Verweis auf die
   Einstellungen statt eines Fehlers.
 - **Netz:** Der App-Container braucht Ausgang zu `ai.efaone.de:443`.
-- **Verbrauch** bucht auf den Key, nicht auf die Person. Die App schickt keine
-  Benutzerkennung an das Gateway.
+- **Verbrauch** zählt als Zusatznutzung der Organisation und erscheint im Portal je Key,
+  nicht im KI-Kontingent der Person. Die App schickt keine Benutzerkennung an das Gateway.
 - **Ausnahme Wissens-Silos (Frage 11):** RAG läuft über efa-ai der Instanz
   (`converge_ai`), dafür gibt es keinen API-Key-Weg.
 
