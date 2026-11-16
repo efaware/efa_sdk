@@ -294,6 +294,18 @@ Excel export for such data. No backend or kernel change.
   scrollbar sits above the table and scrolls in sync with the bottom one. Not on
   mobile. The border moved to an outer wrapper.
 
+**1.34.0 — eye on the secret field.** No kernel or backend change, no new dependency
+(`lucide-react` was already an optional peer).
+- `SecretInput` shows an eye on the right as soon as the user has typed something
+  („Eingabe anzeigen“ / „Eingabe verbergen“, `aria-pressed`, marker
+  `data-efa-action="reveal"`). It reveals only the new input: while the mask of a stored
+  secret is shown, or the field is empty or disabled, there is no eye, and the stored
+  value never comes back from the backend anyway. Emptying the field hides it again.
+  `revealable={false}` turns the eye off.
+- `className` now applies to the wrapper around the field (width), like `SearchInput`.
+- Apps drop their own password fields with an eye and use `SecretInput` for every
+  password, API key and client secret.
+
 **1.33.0 — secret field.** No kernel or backend change, no new dependency.
 - `SecretInput` for API keys, passwords and other secrets. With `isSet` (a secret is
   stored) the empty field shows a fixed row of dots (`SECRET_MASK`, 12 characters), so

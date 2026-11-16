@@ -71,6 +71,8 @@ const perFileThresholds = {
   'src/frontend/ui/Pagination.tsx': { lines: 83, statements: 88, functions: 57, branches: 85 },
   'src/frontend/ui/Checkbox.tsx': { lines: 72, statements: 69, functions: 58, branches: 74 },
   'src/frontend/ui/RadioGroup.tsx': { lines: 90, statements: 90, functions: 66, branches: 91 },
+  // 1.34 Auge im SecretInput: Render-Logik (Maske, Auge nur bei Eingabe) geprüft, Handler ohne DOM nicht. Ist L 57.9 / S 50 / F 25 / B 78.
+  'src/frontend/ui/SecretInput.tsx': { lines: 57, statements: 50, functions: 25, branches: 78 },
   'src/frontend/ui/Avatar.tsx': { lines: 92, statements: 87, functions: 50, branches: 100 },
 };
 

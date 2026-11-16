@@ -1,6 +1,6 @@
 # efa-one App Template
 
-efa-app-template-version: 1.17.0
+efa-app-template-version: 1.17.1
 
 ## What this is
 
@@ -688,7 +688,7 @@ Bestands-Apps auf Tailwind v3 tragen den Pfad stattdessen in `content` der
 | `SegmentedControl` / `RadioGroup` | 2–5 sichtbare Optionen: Umschalter, der sofort wirkt (Ansicht, Zeitraum) bzw. Auswahl mit Erläuterung je Option. |
 | `Checkbox` / `CheckboxGroup` | Auswahl mehrerer Einträge und aktive Zustimmung. **Nicht** für Ein/Aus-Einstellungen (→ `Switch`). |
 | `SearchInput` | Suchfeld über Listen (Lupe, „×“, Escape leert). |
-| `SecretInput` | API-Keys und Passwörter: gespeichert = feste Punktreihe, sonst leer; kein Hinweis „leer = unverändert“ (ab 1.33). |
+| `SecretInput` | API-Keys, Passwörter, Client-Secrets: gespeichert = feste Punktreihe, sonst leer; kein Hinweis „leer = unverändert“ (ab 1.33). Ab 1.34 mit Auge, das nur die neue Eingabe aufdeckt. Kein eigenes Passwortfeld mit Auge bauen. |
 | `FileDropzone` | Datei-Upload per Klick oder Ziehen; prüft `accept`, `maxSize`, `maxFiles`, abgelehnte Dateien über `onReject`. |
 | `useToast` | Kurze Rückmeldung nach einer Aktion („Gespeichert“). Braucht einmal `<ToastProvider>` um die App (neben `TooltipProvider`). Fehler, die im Formular behoben werden müssen, bleiben `Alert`. |
 | `Spinner` / `Progress` | Laden ohne bekannte Form bzw. Fortschritt und Kontingente (`tone`). |
@@ -1053,7 +1053,8 @@ bekommt `'create'` oder `'edit'` und muss in **beiden** Fällen speichern.
 - Edit: immer `SecretInput` aus `@efa-one/sdk/frontend/ui` (ab SDK 1.33) mit
   `isSet={has_secret}`, `value` startet als `''`. Ist ein Geheimnis gespeichert,
   steht eine feste Reihe Punkte im Feld; ohne gespeichertes Geheimnis bleibt es leer.
-  Mitschicken nur, wenn `value` nicht leer ist.
+  Mitschicken nur, wenn `value` nicht leer ist. Ab SDK 1.34 deckt ein Auge die neue
+  Eingabe auf (nie den gespeicherten Wert); kein eigenes Passwortfeld mit Auge bauen.
 - **Kein** Hinweis „leer lassen = unverändert" / „leer lassen, um zu behalten" am
   Feld und kein leeres Feld mit `placeholder="••••"`: die Punkte zeigen, dass etwas
   gespeichert ist. Ein Geheimnis entfernen, wo das fachlich geht, über einen eigenen
