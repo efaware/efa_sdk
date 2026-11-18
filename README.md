@@ -294,6 +294,19 @@ Excel export for such data. No backend or kernel change.
   scrollbar sits above the table and scrolls in sync with the bottom one. Not on
   mobile. The border moved to an outer wrapper.
 
+**1.35.0 — phones and tablets.** No kernel or backend change, no new dependency. Only
+`max-sm:`, `h-dvh` and an arbitrary media variant, so it works in apps with Tailwind 3.4 and 4.
+- Text fields (`Input`, `Textarea`, `Select`, `SearchInput`, `SecretInput`, `Combobox`) use 16 px on touch
+  devices (`any-pointer: coarse`, so also an iPad with trackpad) and stay at 14 px with a mouse. Below 16 px
+  iOS Safari zooms into the page on every tap and stays zoomed. Apps that set 16 px themselves in CSS can
+  drop that rule.
+- `Dialog` (and with it `RecordDialog`) becomes a full-screen sheet below `sm` for every size except `sm`
+  and `md`: no outer margin, height of the visible area (`dvh`), the body grows so the footer sits at the
+  bottom, header and footer keep clear of the notch and the home bar (`env(safe-area-inset-*)`). Short
+  dialogs (`ConfirmDialog`, `size="sm"`/`"md"`) stay a centred card. Above `sm` nothing changes.
+- The centred dialog caps its height at `90dvh` instead of `90vh`, so on phones the footer no longer
+  slides under the browser toolbar.
+
 **1.34.0 — eye on the secret field.** No kernel or backend change, no new dependency
 (`lucide-react` was already an optional peer).
 - `SecretInput` shows an eye on the right as soon as the user has typed something

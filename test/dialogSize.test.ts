@@ -22,7 +22,7 @@ vi.mock('../src/frontend/ui/Dialog', async (importOriginal) => {
   };
 });
 
-const { DEFAULT_DIALOG_SIZE, dialogWidthClass } = await import('../src/frontend/ui/Dialog');
+const { DEFAULT_DIALOG_SIZE, dialogPhoneClasses, dialogWidthClass } = await import('../src/frontend/ui/Dialog');
 const { RecordDialog } = await import('../src/frontend/ui/RecordDialog');
 
 function renderRecordDialog(extra: Record<string, unknown> = {}) {
@@ -93,5 +93,27 @@ describe('RecordDialog – readOnly', () => {
   it('Anlegen bleibt mit readOnly möglich', () => {
     const p = renderRecordDialog({ open: { id: 'new' }, readOnly: true });
     expect(footerParts(p)).toHaveLength(2);
+  });
+});
+
+describe('Dialog auf dem Handy', () => {
+  it('Formular-Dialoge (Vorgabe und breiter) werden unter sm zum Vollbild mit wachsendem Body', () => {
+    for (const size of [undefined, 'lg', '5xl'] as const) {
+      const c = dialogPhoneClasses(size);
+      expect(c.content).toContain('max-sm:h-dvh');
+      expect(c.content).toContain('max-sm:w-full');
+      expect(c.content).toContain('max-sm:max-w-none');
+      expect(c.content).toContain('max-sm:translate-x-0');
+      expect(c.content).toContain('max-sm:rounded-none');
+      expect(c.body).toBe('max-sm:flex-1');
+      expect(c.footer).toContain('env(safe-area-inset-bottom)');
+      expect(c.header).toContain('env(safe-area-inset-top)');
+      // Nur Varianten unter sm: am Rechner bleibt der Dialog unverändert.
+      for (const cls of [c.content, c.body, c.header, c.footer].join(' ').split(' ')) expect(cls).toMatch(/^max-sm:/);
+    }
+  });
+
+  it('kurze Dialoge (sm, md) bleiben auf dem Handy eine Karte', () => {
+    for (const size of ['sm', 'md'] as const) expect(dialogPhoneClasses(size)).toEqual({ content: '', body: '', header: '', footer: '' });
   });
 });

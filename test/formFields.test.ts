@@ -16,6 +16,11 @@ const h = createElement as unknown as (type: unknown, props?: unknown, ...childr
 const html = (el: ReactElement) => renderToStaticMarkup(el);
 
 describe('field', () => {
+  it('fieldClassName: 14 px, auf Touch-Geräten 16 px (sonst zoomt iOS beim Antippen)', () => {
+    expect(fieldClassName()).toContain('text-sm');
+    expect(fieldClassName()).toContain('[@media(any-pointer:coarse)]:text-base');
+  });
+
   it('fieldClassName färbt nur im Fehlerfall rot', () => {
     expect(fieldClassName()).toContain('border-[var(--color-border)]');
     expect(fieldClassName(true)).toContain('border-[var(--color-danger)]');
