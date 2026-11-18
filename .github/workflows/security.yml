@@ -61,10 +61,14 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      # Hard-Fail bei HIGH + CRITICAL. Verbleibende Moderate/Low stehen im BACKLOG.
+      # Hard-Fail bei HIGH + CRITICAL, aber nur für den Laufzeit-Anteil (--omit=dev), wie im
+      # CI-Standard der Apps (Meta-Repo ci/templates/shared/security.yml). Entwicklungswerkzeuge
+      # prüft weiter blockierend `trivy fs` (TRIVY_INCLUDE_DEV_DEPS oben). Anlass 18.11.2026:
+      # picomatch <= 4.0.7 (GHSA-fc5q-39xc-vjpf, nur über vite/vitest) ohne korrigierte Version
+      # hätte sonst jeden PR blockiert. Verbleibende Moderate/Low stehen im BACKLOG.
       - name: npm audit
         working-directory: ${{ matrix.dir }}
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
 
   licenses:
     name: License gate (${{ matrix.dir }})
