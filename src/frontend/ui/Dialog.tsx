@@ -93,10 +93,30 @@ export function dialogWidthClass(size: DialogSize = DEFAULT_DIALOG_SIZE): string
   return `w-[calc(100%-2rem)] ${SIZE_CLASS[size]}`;
 }
 
+/** Kurze Dialoge (Bestätigungen) bleiben auf dem Handy eine Karte; alles darüber wird zum Vollbild. */
+const CARD_ON_PHONE: ReadonlySet<DialogSize> = new Set(['sm', 'md']);
+
+/**
+ * Formular-Dialoge auf dem Handy (unter `sm`) als Vollbild: kein Rand, volle Höhe der sichtbaren Fläche
+ * (`dvh`, ohne die Safari-Leisten), Fußzeile unten mit Abstand zur Home-Leiste. Ab `sm` und für `sm`/`md`
+ * bleibt der zentrierte Dialog. Leer = keine Änderung. Nur `max-sm:` und `h-dvh`, die es in Tailwind 3.4 und 4 gibt.
+ */
+export function dialogPhoneClasses(size: DialogSize = DEFAULT_DIALOG_SIZE): { content: string; body: string; header: string; footer: string } {
+  if (CARD_ON_PHONE.has(size)) return { content: '', body: '', header: '', footer: '' };
+  return {
+    content: 'max-sm:left-0 max-sm:top-0 max-sm:translate-x-0 max-sm:translate-y-0 max-sm:w-full max-sm:max-w-none max-sm:h-dvh max-sm:max-h-none max-sm:rounded-none max-sm:border-0',
+    // Mit fester Höhe darf der Body wachsen: die Fußzeile steht dann unten statt mitten im Bild.
+    body: 'max-sm:flex-1',
+    header: 'max-sm:pt-[max(1.25rem,env(safe-area-inset-top))]',
+    footer: 'max-sm:pb-[max(1.25rem,env(safe-area-inset-bottom))]',
+  };
+}
+
 export function Dialog({ open, onOpenChange, trigger, title, description, children, banner, footer, size = DEFAULT_DIALOG_SIZE, dataAttributes, initialFocus = 'first-field' }: DialogProps) {
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const footerRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
+  const phone = dialogPhoneClasses(size);
   const onOpenAutoFocus = (e: Event) => {
     const target = pickInitialFocus(initialFocus, bodyRef.current, footerRef.current);
     if (target === null) return;
@@ -118,7 +138,7 @@ export function Dialog({ open, onOpenChange, trigger, title, description, childr
           wächst er bei langem Inhalt (lange Formulare, aufklappende Listen,
           viel Text) über den Viewport hinaus: oben rutscht der Titel weg,
           unten der Footer — und damit der Speichern-Button aus dem Fenster.
-          Deshalb `max-h-[90vh]` + Spalten-Flex; gescrollt wird ausschließlich
+          Deshalb `max-h-[90dvh]` (sichtbare Höhe, auf dem Handy ohne die Browser-Leisten) + Spalten-Flex; gescrollt wird ausschließlich
           im Body, Header und Footer bleiben stehen.
 
           Absichtlich KEIN `flex-1` am Body: in einem höhen-auto Flex-Container
@@ -133,10 +153,10 @@ export function Dialog({ open, onOpenChange, trigger, title, description, childr
           onOpenAutoFocus={onOpenAutoFocus}
           onEscapeKeyDown={guardDialogEscape}
           onInteractOutside={guardDialogOutside}
-          className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 ${dialogWidthClass(size)} flex flex-col max-h-[90vh] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95`}
+          className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 ${dialogWidthClass(size)} flex flex-col max-h-[90dvh] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 ${phone.content}`}
         >
           {/* Header */}
-          <div className="shrink-0 flex items-start justify-between p-5 border-b border-[var(--color-border)]">
+          <div className={`shrink-0 flex items-start justify-between p-5 border-b border-[var(--color-border)] ${phone.header}`}>
             <div>
               <RadixDialog.Title className="text-base font-semibold text-[var(--color-text-primary)]">
                 {title}
@@ -156,11 +176,11 @@ export function Dialog({ open, onOpenChange, trigger, title, description, childr
           {banner && <div className="shrink-0 px-5 pt-5">{banner}</div>}
 
           {/* Body — der einzige scrollende Bereich */}
-          <div ref={bodyRef} className="min-h-0 overflow-y-auto p-5">{children}</div>
+          <div ref={bodyRef} className={`min-h-0 overflow-y-auto p-5 ${phone.body}`}>{children}</div>
 
           {/* Footer */}
           {footer && (
-            <div ref={footerRef} className="shrink-0 flex items-center justify-end gap-2 px-5 pb-5">
+            <div ref={footerRef} className={`shrink-0 flex items-center justify-end gap-2 px-5 pb-5 ${phone.footer}`}>
               {footer}
             </div>
           )}
