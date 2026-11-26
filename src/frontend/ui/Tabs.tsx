@@ -31,7 +31,7 @@ export function tabPanelId(prefix: string, key: string): string {
 
 /** ID-Präfix aus dem Anzeigenamen. */
 export function tabIdPrefix(ariaLabel: string): string {
-  const slug = ariaLabel.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const slug = ariaLabel.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); // Läufe sind schon zu einem '-' zusammengefasst
   return `efa-tabs-${slug || 'x'}`;
 }
 
