@@ -53,6 +53,13 @@ describe('tabIdPrefix', () => {
     expect(tabIdPrefix('Übersicht')).toBe('efa-tabs-ubersicht');
     expect(tabIdPrefix('—')).toBe('efa-tabs-x');
   });
+
+  it('Ränder abgeschnitten, lange Bindestrich-Läufe schnell', () => {
+    expect(tabIdPrefix('  -- Agent / Konfiguration --  ')).toBe('efa-tabs-agent-konfiguration');
+    const start = Date.now();
+    expect(tabIdPrefix(`a${'-'.repeat(100_000)}b`)).toBe('efa-tabs-a-b');
+    expect(Date.now() - start).toBeLessThan(500);
+  });
 });
 
 describe('nextTabKey', () => {
